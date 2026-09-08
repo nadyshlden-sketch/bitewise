@@ -647,7 +647,7 @@ function MealCard({
         aria-label={`Log Meal for ${meal.name}`}
         onClick={() => onLogMeal(meal.name)}
       >
-        <Plus size={36} strokeWidth={2.4} aria-hidden="true" />
+        <Plus size={27} strokeWidth={2.4} aria-hidden="true" />
       </button>
 
       {isExpanded ? (
