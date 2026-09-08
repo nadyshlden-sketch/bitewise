@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Home, KeyRound, Pencil, Plus, Settings as SettingsIcon, Trash2, X } from "lucide-react";
-import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useState } from "react";
+import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { findFoodDatabaseMatches, FoodDatabaseEntry } from "./data/foodDatabase";
 import {
   clearGeminiApiKey,
@@ -627,6 +627,7 @@ function SettingsScreen({
   const [targets, setTargets] = useState(() => targetDraftFromGoals(profile.calorieGoal, profile.macroGoals));
   const [apiDraft, setApiDraft] = useState<ApiKeyDraft>({ value: "", error: "" });
   const [targetsSaved, setTargetsSaved] = useState(false);
+  const [openPanel, setOpenPanel] = useState<"targets" | "api" | null>(null);
   const hasSavedKey = savedKey.length > 0;
 
   useEffect(() => {
@@ -669,67 +670,97 @@ function SettingsScreen({
       </header>
 
       <form className="settings-card" onSubmit={submitTargets}>
-        <div className="settings-card-header">
-          <span>Daily targets</span>
-          {targetsSaved ? <small>Saved</small> : null}
-        </div>
-
-        <label className="field-label">
-          Calories
-          <input inputMode="numeric" value={targets.calories} onChange={(event) => updateTargets({ calories: event.target.value })} />
-        </label>
-
-        <div className="field-grid">
-          <label className="field-label">
-            Protein
-            <input inputMode="numeric" value={targets.protein} onChange={(event) => updateTargets({ protein: event.target.value })} />
-          </label>
-          <label className="field-label">
-            Carbs
-            <input inputMode="numeric" value={targets.carbs} onChange={(event) => updateTargets({ carbs: event.target.value })} />
-          </label>
-          <label className="field-label">
-            Fat
-            <input inputMode="numeric" value={targets.fat} onChange={(event) => updateTargets({ fat: event.target.value })} />
-          </label>
-        </div>
-
-        <button className="save-meal-button" type="submit" disabled={!targetDraftIsValid(targets)}>
-          Save targets
+        <button
+          className="settings-card-toggle"
+          type="button"
+          aria-expanded={openPanel === "targets"}
+          onClick={() => setOpenPanel((current) => (current === "targets" ? null : "targets"))}
+        >
+          <span>
+            <strong>Daily targets</strong>
+            <small>
+              {profile.calorieGoal} kcal · P {profile.macroGoals.Protein}g · C {profile.macroGoals.Carbs}g · F {profile.macroGoals.Fat}g
+            </small>
+          </span>
+          <span className="settings-toggle-meta">
+            {targetsSaved ? <small>Saved</small> : null}
+            {openPanel === "targets" ? <ChevronUp size={19} strokeWidth={2.5} /> : <ChevronDown size={19} strokeWidth={2.5} />}
+          </span>
         </button>
+
+        {openPanel === "targets" ? (
+          <div className="settings-panel-body">
+            <label className="field-label">
+              Calories
+              <input inputMode="numeric" value={targets.calories} onChange={(event) => updateTargets({ calories: event.target.value })} />
+            </label>
+
+            <div className="field-grid">
+              <label className="field-label">
+                Protein
+                <input inputMode="numeric" value={targets.protein} onChange={(event) => updateTargets({ protein: event.target.value })} />
+              </label>
+              <label className="field-label">
+                Carbs
+                <input inputMode="numeric" value={targets.carbs} onChange={(event) => updateTargets({ carbs: event.target.value })} />
+              </label>
+              <label className="field-label">
+                Fat
+                <input inputMode="numeric" value={targets.fat} onChange={(event) => updateTargets({ fat: event.target.value })} />
+              </label>
+            </div>
+
+            <button className="save-meal-button" type="submit" disabled={!targetDraftIsValid(targets)}>
+              Save targets
+            </button>
+          </div>
+        ) : null}
       </form>
 
       <form className="settings-card" onSubmit={submitKey}>
-        <div className="settings-card-header">
-          <span>Gemini API key</span>
-          <KeyRound size={18} strokeWidth={2.4} aria-hidden="true" />
-        </div>
+        <button
+          className="settings-card-toggle"
+          type="button"
+          aria-expanded={openPanel === "api"}
+          onClick={() => setOpenPanel((current) => (current === "api" ? null : "api"))}
+        >
+          <span>
+            <strong>Gemini API key</strong>
+            <small>{hasSavedKey ? maskGeminiApiKey(savedKey) : "Not saved"}</small>
+          </span>
+          <span className="settings-toggle-meta">
+            <KeyRound size={18} strokeWidth={2.4} aria-hidden="true" />
+            {openPanel === "api" ? <ChevronUp size={19} strokeWidth={2.5} /> : <ChevronDown size={19} strokeWidth={2.5} />}
+          </span>
+        </button>
 
-        {hasSavedKey ? <p className="key-status">Saved key: {maskGeminiApiKey(savedKey)}</p> : null}
+        {openPanel === "api" ? (
+          <div className="settings-panel-body">
+            <label className="field-label">
+              {hasSavedKey ? "Replace key" : "API key"}
+              <input
+                autoComplete="off"
+                value={apiDraft.value}
+                onChange={(event) => setApiDraft({ value: event.target.value, error: "" })}
+                placeholder="Paste Gemini API key"
+                type="password"
+              />
+            </label>
 
-        <label className="field-label">
-          {hasSavedKey ? "Replace key" : "API key"}
-          <input
-            autoComplete="off"
-            value={apiDraft.value}
-            onChange={(event) => setApiDraft({ value: event.target.value, error: "" })}
-            placeholder="Paste Gemini API key"
-            type="password"
-          />
-        </label>
+            {apiDraft.error ? <p className="form-error">{apiDraft.error}</p> : null}
 
-        {apiDraft.error ? <p className="form-error">{apiDraft.error}</p> : null}
-
-        <div className="key-actions">
-          <button className="save-meal-button" type="submit">
-            {hasSavedKey ? "Replace key" : "Save key"}
-          </button>
-          {hasSavedKey ? (
-            <button className="clear-key-button" type="button" onClick={onClearApiKey}>
-              Clear key
-            </button>
-          ) : null}
-        </div>
+            <div className="key-actions">
+              <button className="save-meal-button" type="submit">
+                {hasSavedKey ? "Replace key" : "Save key"}
+              </button>
+              {hasSavedKey ? (
+                <button className="clear-key-button" type="button" onClick={onClearApiKey}>
+                  Clear key
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </form>
     </section>
   );
@@ -1281,6 +1312,7 @@ export function App() {
   const [geminiApiKey, setGeminiApiKey] = useState(getStoredGeminiApiKey);
   const [expandedMeal, setExpandedMeal] = useState<MealName | null>(null);
   const [activeView, setActiveView] = useState<AppView>("home");
+  const frameRef = useRef<HTMLElement | null>(null);
   const { profile, logs } = storedState;
   const dateIndicator = getDateIndicator(selectedDateKey);
 
@@ -1293,6 +1325,10 @@ export function App() {
       // Some embedded preview browsers disable storage. The app still works in memory.
     }
   }, [storedState]);
+
+  useEffect(() => {
+    frameRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [activeView]);
 
   const selectedLogs = useMemo(() => logs.filter((log) => log.dateKey === selectedDateKey), [logs, selectedDateKey]);
 
@@ -1460,7 +1496,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <section className="phone-frame" aria-label="Bitewise home">
+      <section className="phone-frame" aria-label="Bitewise home" ref={frameRef}>
         {activeView === "home" ? (
           <>
             <header className="date-header">
