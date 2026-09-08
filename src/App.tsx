@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useState } from "react";
+import { findFoodDatabaseMatches, FoodDatabaseEntry } from "./data/foodDatabase";
 import {
   clearGeminiApiKey,
   getStoredGeminiApiKey,
@@ -695,7 +696,28 @@ function LogSheet({
   apiKey: string;
   onNeedApiKey: () => void;
 }) {
+  const [databaseQuery, setDatabaseQuery] = useState("");
   const canSave = draft.title.trim().length > 0 && addNumber(draft.calories) > 0;
+  const databaseMatches = useMemo(() => findFoodDatabaseMatches(databaseQuery, 8), [databaseQuery]);
+
+  const selectDatabaseFood = (entry: FoodDatabaseEntry) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            title: entry.name,
+            calories: String(entry.calories),
+            protein: String(entry.protein),
+            carbs: String(entry.carbs),
+            fat: String(entry.fat),
+            aiResult: null,
+            aiError: "",
+            aiStatus: "idle",
+          }
+        : current,
+    );
+  };
+
   const estimateWithAi = async () => {
     if (!apiKey) {
       setDraft((current) =>
@@ -835,6 +857,46 @@ function LogSheet({
                     </li>
                   ))}
                 </ul>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {!draft.editingId ? (
+          <section className="database-search-panel" aria-label="Food database search">
+            <label className="field-label">
+              Search database
+              <input
+                value={databaseQuery}
+                onChange={(event) => setDatabaseQuery(event.target.value)}
+                placeholder="Egg, banana, rice..."
+              />
+            </label>
+            {databaseQuery.trim() ? (
+              <div className="database-results" aria-label="Database matches">
+                {databaseMatches.length > 0 ? (
+                  databaseMatches.map((entry) => (
+                    <button
+                      className="database-result"
+                      key={`${entry.name}-${entry.serving}`}
+                      type="button"
+                      onClick={() => selectDatabaseFood(entry)}
+                    >
+                      <span>
+                        <strong>{entry.name}</strong>
+                        <small>{entry.serving}</small>
+                      </span>
+                      <span className="database-result-nutrition">
+                        <strong>{entry.calories} kcal</strong>
+                        <small>
+                          P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+                        </small>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="database-empty">No database match yet</p>
+                )}
               </div>
             ) : null}
           </section>

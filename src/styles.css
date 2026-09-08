@@ -615,8 +615,75 @@ button {
   background: var(--meadow-2);
 }
 
-.ai-log-panel .field-label {
+.ai-log-panel .field-label,
+.database-search-panel .field-label {
   margin-bottom: 10px;
+}
+
+.database-search-panel {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #eef6e7;
+}
+
+.database-search-panel input {
+  background: var(--white);
+}
+
+.database-results {
+  display: grid;
+  gap: 7px;
+}
+
+.database-result {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.database-result span,
+.database-result strong,
+.database-result small {
+  min-width: 0;
+}
+
+.database-result strong,
+.database-result small {
+  display: block;
+  line-height: 1.15;
+}
+
+.database-result strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.database-result small {
+  margin-top: 4px;
+  color: rgba(5, 5, 5, 0.58);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.database-result-nutrition {
+  text-align: right;
+}
+
+.database-empty {
+  margin: 0;
+  color: rgba(5, 5, 5, 0.58);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .field-label textarea {
