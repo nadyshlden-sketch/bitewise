@@ -14,6 +14,8 @@
   --meadow-8: #1a759f;
   --meadow-9: #1e6091;
   --meadow-10: #184e77;
+  --primary-cta: #b5e48c;
+  --primary-cta-text: #050505;
   --page-bg: #eeeeee;
   --card-radius: 21px;
   --edge: clamp(20px, 8.2vw, 34px);
@@ -47,6 +49,7 @@ input,
 textarea,
 select {
   font: inherit;
+  font-family: "Poppins", sans-serif;
 }
 
 fieldset {
@@ -831,8 +834,8 @@ button {
 .quick-add-button {
   min-height: 38px;
   border-radius: 999px;
-  background: var(--meadow-10);
-  color: var(--white);
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
   padding: 0 18px;
   font-size: 14px;
   font-weight: 800;
@@ -868,10 +871,10 @@ button {
   width: 100%;
   min-height: 46px;
   border-radius: 999px;
-  background: var(--meadow-10);
-  color: var(--white);
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -1119,10 +1122,10 @@ button {
   min-height: 52px;
   margin-top: 4px;
   border-radius: 999px;
-  background: var(--meadow-10);
-  color: var(--white);
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 800;
   cursor: pointer;
 }
 
