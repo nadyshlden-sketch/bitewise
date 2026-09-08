@@ -62,6 +62,18 @@ type MealSummary = {
   tone: "spring" | "meadow" | "lagoon" | "ocean";
 };
 
+type MyFoodEntry = {
+  signature: string;
+  mealName: MealName;
+  title: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  loggedAt: string;
+  count: number;
+};
+
 type LogDraft = {
   editingId: string | null;
   mealName: MealName;
@@ -263,6 +275,46 @@ function scaleDatabaseFood(entry: FoodDatabaseEntry, amountValue: string, unit: 
     protein: Math.round(entry.protein * ratio),
     carbs: Math.round(entry.carbs * ratio),
     fat: Math.round(entry.fat * ratio),
+  };
+}
+
+function foodSignature(log: MealLog) {
+  return [log.title.trim().toLowerCase(), log.calories, log.protein, log.carbs, log.fat].join("|");
+}
+
+function getMyFoods(logs: MealLog[]) {
+  const sortedLogs = [...logs].sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
+  const bySignature = new Map<string, MyFoodEntry>();
+
+  for (const log of sortedLogs) {
+    const signature = foodSignature(log);
+    const current = bySignature.get(signature);
+
+    if (current) {
+      current.count += 1;
+      continue;
+    }
+
+    bySignature.set(signature, {
+      signature,
+      mealName: log.mealName,
+      title: log.title,
+      calories: log.calories,
+      protein: log.protein,
+      carbs: log.carbs,
+      fat: log.fat,
+      loggedAt: log.loggedAt,
+      count: 1,
+    });
+  }
+
+  const entries = [...bySignature.values()];
+
+  return {
+    recent: entries.slice(0, 5),
+    frequent: [...entries]
+      .sort((a, b) => b.count - a.count || new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime())
+      .slice(0, 5),
   };
 }
 
@@ -926,6 +978,56 @@ function MealCard({
   );
 }
 
+function MyFoodsSection({
+  recent,
+  frequent,
+  onRelogFood,
+}: {
+  recent: MyFoodEntry[];
+  frequent: MyFoodEntry[];
+  onRelogFood: (entry: MyFoodEntry) => void;
+}) {
+  if (recent.length === 0 && frequent.length === 0) {
+    return null;
+  }
+
+  const renderFoodCard = (entry: MyFoodEntry, label: "recent" | "frequent") => (
+    <button className="my-food-card" key={`${label}-${entry.signature}`} type="button" onClick={() => onRelogFood(entry)}>
+      <span className="my-food-title">{entry.title}</span>
+      <span className="my-food-meta">
+        {entry.calories} kcal · {entry.mealName}
+      </span>
+      <span className="my-food-macros">
+        P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+      </span>
+      {label === "frequent" ? <span className="my-food-count">{entry.count}x</span> : null}
+    </button>
+  );
+
+  return (
+    <section className="my-foods" aria-label="My Foods">
+      <div className="my-foods-header">
+        <p>My Foods</p>
+        <span>Tap to log again</span>
+      </div>
+
+      {recent.length > 0 ? (
+        <div className="my-foods-group">
+          <h2>Recent</h2>
+          <div className="my-foods-row">{recent.map((entry) => renderFoodCard(entry, "recent"))}</div>
+        </div>
+      ) : null}
+
+      {frequent.length > 0 ? (
+        <div className="my-foods-group">
+          <h2>Frequent</h2>
+          <div className="my-foods-row">{frequent.map((entry) => renderFoodCard(entry, "frequent"))}</div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function LogSheet({
   draft,
   setDraft,
@@ -1365,6 +1467,8 @@ export function App() {
     }));
   }, [profile, selectedLogs]);
 
+  const myFoods = useMemo(() => getMyFoods(logs), [logs]);
+
   if (!profile) {
     return (
       <OnboardingScreen
@@ -1406,6 +1510,28 @@ export function App() {
       version: CURRENT_STORAGE_VERSION,
       logs: current.logs.filter((log) => log.id !== id),
     }));
+  };
+
+  const relogFood = (entry: MyFoodEntry) => {
+    const nextLog: MealLog = {
+      id: makeId(),
+      kind: "meal",
+      dateKey: selectedDateKey,
+      loggedAt: new Date().toISOString(),
+      mealName: entry.mealName,
+      title: entry.title,
+      calories: entry.calories,
+      protein: entry.protein,
+      carbs: entry.carbs,
+      fat: entry.fat,
+    };
+
+    setStoredState((current) => ({
+      ...current,
+      version: CURRENT_STORAGE_VERSION,
+      logs: [...current.logs, nextLog],
+    }));
+    setExpandedMeal(entry.mealName);
   };
 
   const saveLog = (keepOpen = false) => {
@@ -1524,6 +1650,8 @@ export function App() {
                 onNeedApiKey={() => setActiveView("settings")}
               />
             ) : null}
+
+            <MyFoodsSection recent={myFoods.recent} frequent={myFoods.frequent} onRelogFood={relogFood} />
 
             <div className="meal-list" aria-label="Meals">
               {mealSummaries.map((meal) => (

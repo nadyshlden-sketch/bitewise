@@ -441,6 +441,115 @@ button {
   padding-bottom: calc(90px + env(safe-area-inset-bottom));
 }
 
+.my-foods {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.my-foods-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.my-foods-header p,
+.my-foods-group h2 {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.my-foods-header p {
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.my-foods-header span {
+  color: rgba(5, 5, 5, 0.56);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.my-foods-group {
+  display: grid;
+  gap: 8px;
+}
+
+.my-foods-group h2 {
+  color: rgba(5, 5, 5, 0.68);
+  font-size: 12px;
+}
+
+.my-foods-row {
+  display: flex;
+  gap: 9px;
+  margin: 0 calc(var(--edge) * -1);
+  padding: 0 var(--edge) 5px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.my-foods-row::-webkit-scrollbar {
+  display: none;
+}
+
+.my-food-card {
+  position: relative;
+  flex: 0 0 156px;
+  min-height: 104px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  scroll-snap-align: start;
+  padding: 13px;
+  border-radius: 18px;
+  background: var(--white);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.my-food-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.my-food-meta,
+.my-food-macros {
+  color: rgba(5, 5, 5, 0.58);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.my-food-count {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  min-width: 30px;
+  border-radius: 999px;
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
 .meal-card {
   min-height: 52px;
   border-radius: 26px;
@@ -1338,6 +1447,18 @@ button {
     width: min(100vw, 640px);
   }
 
+  .my-foods-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .my-food-card {
+    min-width: 0;
+  }
+
   .meal-sheet {
     width: min(calc(100vw - 48px), 640px);
     border-radius: 28px 28px 0 0;
@@ -1351,6 +1472,10 @@ button {
 @media (min-width: 1120px) {
   .phone-frame {
     width: min(100vw, 720px);
+  }
+
+  .my-foods-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .meal-sheet {
