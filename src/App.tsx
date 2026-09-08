@@ -100,6 +100,14 @@ type ApiKeyDraft = {
   error: string;
 };
 
+type PortionUnit = "serving" | "g";
+
+type SelectedDatabaseFood = {
+  entry: FoodDatabaseEntry;
+  amount: string;
+  unit: PortionUnit;
+};
+
 const CURRENT_STORAGE_VERSION = 5;
 const STORAGE_KEY = "bitewise-state-v5";
 
@@ -193,6 +201,42 @@ function makeId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getServingDetails(entry: FoodDatabaseEntry) {
+  const grams = Number(entry.serving.match(/(\d+(?:\.\d+)?)\s*g/i)?.[1] ?? 0);
+  let baseLabel = entry.serving
+    .split(",")[0]
+    .replace(/^1\s+/i, "")
+    .trim() || "serving";
+  if (/^(small|medium|large)$/i.test(baseLabel)) {
+    baseLabel = "piece";
+  }
+  const prefersGrams = /rice|pasta|quinoa|oatmeal|beans|chickpeas|lentils|yogurt|cheese|hummus|meat|chicken|beef|salmon|tuna|shrimp|tofu|tempeh/i.test(
+    entry.name,
+  );
+
+  return {
+    grams,
+    baseLabel,
+    defaultUnit: grams > 0 && prefersGrams ? "g" : "serving",
+    defaultAmount: grams > 0 && prefersGrams ? String(grams) : "1",
+  } satisfies { grams: number; baseLabel: string; defaultUnit: PortionUnit; defaultAmount: string };
+}
+
+function scaleDatabaseFood(entry: FoodDatabaseEntry, amountValue: string, unit: PortionUnit) {
+  const amount = Number(amountValue);
+  const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 0;
+  const { grams } = getServingDetails(entry);
+  const ratio = unit === "g" && grams > 0 ? safeAmount / grams : safeAmount;
+
+  return {
+    title: `${safeAmount || 0}${unit === "g" ? "g" : ` ${getServingDetails(entry).baseLabel}`} ${entry.name}`.trim(),
+    calories: Math.round(entry.calories * ratio),
+    protein: Math.round(entry.protein * ratio),
+    carbs: Math.round(entry.carbs * ratio),
+    fat: Math.round(entry.fat * ratio),
+  };
 }
 
 function loadStoredState(): StoredState {
@@ -697,22 +741,63 @@ function LogSheet({
   onNeedApiKey: () => void;
 }) {
   const [databaseQuery, setDatabaseQuery] = useState("");
+  const [selectedDatabaseFood, setSelectedDatabaseFood] = useState<SelectedDatabaseFood | null>(null);
   const canSave = draft.title.trim().length > 0 && addNumber(draft.calories) > 0;
   const databaseMatches = useMemo(() => findFoodDatabaseMatches(databaseQuery, 8), [databaseQuery]);
 
-  const selectDatabaseFood = (entry: FoodDatabaseEntry) => {
+  const applyDatabasePortion = (entry: FoodDatabaseEntry, amount: string, unit: PortionUnit) => {
+    const scaled = scaleDatabaseFood(entry, amount, unit);
     setDraft((current) =>
       current
         ? {
             ...current,
-            title: entry.name,
-            calories: String(entry.calories),
-            protein: String(entry.protein),
-            carbs: String(entry.carbs),
-            fat: String(entry.fat),
+            title: scaled.title,
+            calories: String(scaled.calories),
+            protein: String(scaled.protein),
+            carbs: String(scaled.carbs),
+            fat: String(scaled.fat),
             aiResult: null,
             aiError: "",
             aiStatus: "idle",
+          }
+        : current,
+    );
+  };
+
+  const selectDatabaseFood = (entry: FoodDatabaseEntry) => {
+    const details = getServingDetails(entry);
+    setSelectedDatabaseFood({
+      entry,
+      amount: details.defaultAmount,
+      unit: details.defaultUnit,
+    });
+    setDatabaseQuery("");
+    applyDatabasePortion(entry, details.defaultAmount, details.defaultUnit);
+  };
+
+  const updateDatabasePortion = (next: Partial<Omit<SelectedDatabaseFood, "entry">>) => {
+    if (!selectedDatabaseFood) {
+      return;
+    }
+
+    const updated = { ...selectedDatabaseFood, ...next };
+    setSelectedDatabaseFood(updated);
+    applyDatabasePortion(updated.entry, updated.amount, updated.unit);
+  };
+
+  const applyAiResultToDraft = (result: ParsedMeal) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            title: result.title,
+            calories: String(result.totalCalories),
+            protein: String(result.totalProtein),
+            carbs: String(result.totalCarbs),
+            fat: String(result.totalFat),
+            aiResult: result,
+            aiError: "",
+            aiStatus: "ready",
           }
         : current,
     );
@@ -751,20 +836,8 @@ function LogSheet({
 
     try {
       const result = await parseMealWithGemini(input, apiKey);
-      setDraft((current) =>
-        current
-          ? {
-              ...current,
-              title: result.title,
-              calories: String(result.totalCalories),
-              protein: String(result.totalProtein),
-              carbs: String(result.totalCarbs),
-              fat: String(result.totalFat),
-              aiResult: result,
-              aiStatus: "ready",
-            }
-          : current,
-      );
+      setSelectedDatabaseFood(null);
+      applyAiResultToDraft(result);
     } catch (error) {
       setDraft((current) =>
         current
@@ -779,9 +852,7 @@ function LogSheet({
   };
 
   return (
-    <div className="sheet-backdrop" role="presentation" onMouseDown={onClose}>
-      <form className="meal-sheet" aria-label="Log Meal" onSubmit={onSave} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="sheet-handle" aria-hidden="true" />
+      <form className="log-section" aria-label="Log Meal" onSubmit={onSave}>
         <div className="sheet-header">
           <div>
             <p>{draft.mealName}</p>
@@ -791,12 +862,74 @@ function LogSheet({
             <X size={22} strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
-        <div className="ai-key-row">
-          <span>{apiKey ? `Gemini key ${maskGeminiApiKey(apiKey)}` : "Gemini key not set"}</span>
-          <button type="button" onClick={onNeedApiKey}>
-            {apiKey ? "Replace" : "Add key"}
-          </button>
-        </div>
+
+        {!draft.editingId ? (
+          <section className="database-search-panel" aria-label="Food database search">
+            <label className="field-label">
+              Search database
+              <input
+                value={databaseQuery}
+                onChange={(event) => setDatabaseQuery(event.target.value)}
+                placeholder="Egg, banana, rice..."
+              />
+            </label>
+            {selectedDatabaseFood ? (
+              <div className="portion-card" aria-label="Selected food portion">
+                <div>
+                  <strong>{selectedDatabaseFood.entry.name}</strong>
+                  <span>{selectedDatabaseFood.entry.serving}</span>
+                </div>
+                <div className="portion-controls">
+                  <label className="field-label">
+                    Amount
+                    <input
+                      inputMode="decimal"
+                      value={selectedDatabaseFood.amount}
+                      onChange={(event) => updateDatabasePortion({ amount: event.target.value })}
+                    />
+                  </label>
+                  <label className="field-label">
+                    Unit
+                    <select
+                      value={selectedDatabaseFood.unit}
+                      onChange={(event) => updateDatabasePortion({ unit: event.target.value as PortionUnit })}
+                    >
+                      <option value="serving">{getServingDetails(selectedDatabaseFood.entry).baseLabel}</option>
+                      {getServingDetails(selectedDatabaseFood.entry).grams > 0 ? <option value="g">grams</option> : null}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            ) : null}
+            {databaseQuery.trim() ? (
+              <div className="database-results" aria-label="Database matches">
+                {databaseMatches.length > 0 ? (
+                  databaseMatches.map((entry) => (
+                    <button
+                      className="database-result"
+                      key={`${entry.name}-${entry.serving}`}
+                      type="button"
+                      onClick={() => selectDatabaseFood(entry)}
+                    >
+                      <span>
+                        <strong>{entry.name}</strong>
+                        <small>{entry.serving}</small>
+                      </span>
+                      <span className="database-result-nutrition">
+                        <strong>{entry.calories} kcal</strong>
+                        <small>
+                          P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+                        </small>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="database-empty">No database match yet</p>
+                )}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {!draft.editingId ? (
           <section className="ai-log-panel" aria-label="AI food logging">
@@ -862,46 +995,6 @@ function LogSheet({
           </section>
         ) : null}
 
-        {!draft.editingId ? (
-          <section className="database-search-panel" aria-label="Food database search">
-            <label className="field-label">
-              Search database
-              <input
-                value={databaseQuery}
-                onChange={(event) => setDatabaseQuery(event.target.value)}
-                placeholder="Egg, banana, rice..."
-              />
-            </label>
-            {databaseQuery.trim() ? (
-              <div className="database-results" aria-label="Database matches">
-                {databaseMatches.length > 0 ? (
-                  databaseMatches.map((entry) => (
-                    <button
-                      className="database-result"
-                      key={`${entry.name}-${entry.serving}`}
-                      type="button"
-                      onClick={() => selectDatabaseFood(entry)}
-                    >
-                      <span>
-                        <strong>{entry.name}</strong>
-                        <small>{entry.serving}</small>
-                      </span>
-                      <span className="database-result-nutrition">
-                        <strong>{entry.calories} kcal</strong>
-                        <small>
-                          P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
-                        </small>
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="database-empty">No database match yet</p>
-                )}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
         <label className="field-label">
           {draft.editingId ? "Food" : "Food name"}
           <input
@@ -955,7 +1048,6 @@ function LogSheet({
           {draft.editingId ? "Save food" : `Add to ${draft.mealName}`}
         </button>
       </form>
-    </div>
   );
 }
 
@@ -978,12 +1070,6 @@ export function App() {
       // Some embedded preview browsers disable storage. The app still works in memory.
     }
   }, [storedState]);
-
-  useEffect(() => {
-    if (profile && !geminiApiKey) {
-      setShowApiKeySheet(true);
-    }
-  }, [geminiApiKey, profile]);
 
   const selectedLogs = useMemo(() => logs.filter((log) => log.dateKey === selectedDateKey), [logs, selectedDateKey]);
 
@@ -1164,6 +1250,17 @@ export function App() {
 
         <CalorieArc calorieGoal={profile.calorieGoal} consumed={consumed} macros={macros} />
 
+        {draft ? (
+          <LogSheet
+            draft={draft}
+            setDraft={setDraft}
+            onClose={() => setDraft(null)}
+            onSave={saveLog}
+            apiKey={geminiApiKey}
+            onNeedApiKey={() => setShowApiKeySheet(true)}
+          />
+        ) : null}
+
         <div className="meal-list" aria-label="Meals">
           {mealSummaries.map((meal) => (
             <MealCard
@@ -1180,16 +1277,6 @@ export function App() {
 
       </section>
 
-      {draft ? (
-        <LogSheet
-          draft={draft}
-          setDraft={setDraft}
-          onClose={() => setDraft(null)}
-          onSave={saveLog}
-          apiKey={geminiApiKey}
-          onNeedApiKey={() => setShowApiKeySheet(true)}
-        />
-      ) : null}
       {showApiKeySheet ? (
         <ApiKeySheet
           savedKey={geminiApiKey}
