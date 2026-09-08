@@ -1,3 +1,5 @@
+import { findFoodDatabaseMatches, formatFoodDatabaseReference } from "../data/foodDatabase";
+
 export const GEMINI_API_KEY_STORAGE_KEY = "gemini_api_key";
 
 export type ParsedFoodItem = {
@@ -106,6 +108,9 @@ export async function parseMealWithGemini(input: string, apiKey: string): Promis
     throw new Error("Describe what you ate first.");
   }
 
+  const databaseMatches = findFoodDatabaseMatches(trimmedInput, 35);
+  const foodReference = formatFoodDatabaseReference(databaseMatches);
+
   const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent", {
     method: "POST",
     headers: {
@@ -119,8 +124,14 @@ export async function parseMealWithGemini(input: string, apiKey: string): Promis
             {
               text: [
                 "Parse this meal for a personal calorie tracker.",
+                "Use the local nutrition database reference first.",
+                "When a described food clearly matches a database item, scale that database item's calories and macros by the user's quantity and serving size.",
+                "Only estimate from general nutrition knowledge when no database match is relevant.",
+                "Break combined meals into individual food items whenever possible.",
                 "Estimate calories and macros for each individual food item.",
                 "Return realistic estimates only. Do not include commentary.",
+                "Local nutrition database reference:",
+                foodReference,
                 `Meal: ${trimmedInput}`,
               ].join("\n"),
             },
