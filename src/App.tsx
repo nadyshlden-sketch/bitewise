@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Home, KeyRound, Pencil, Plus, Settings as SettingsIcon, Star, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Home, KeyRound, Pencil, Plus, Settings as SettingsIcon, Star, Trash2, X } from "lucide-react";
 import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { findFoodDatabaseMatches, FoodDatabaseEntry } from "./data/foodDatabase";
 import {
@@ -127,6 +127,11 @@ type SelectedDatabaseFood = {
   entry: FoodDatabaseEntry;
   amount: string;
   unit: PortionUnit;
+};
+
+type ToastState = {
+  id: number;
+  message: string;
 };
 
 const CURRENT_STORAGE_VERSION = 5;
@@ -334,7 +339,7 @@ function loadStoredState(): StoredState {
       return fallbackState;
     }
 
-    const profile = parsed.profile ? { ...parsed.profile, ...calculateNutritionTargets(parsed.profile) } : null;
+    const profile = parsed.profile ? { ...calculateNutritionTargets(parsed.profile), ...parsed.profile } : null;
     return { ...fallbackState, ...parsed, profile, logs: normalizeStoredLogs(parsed.logs ?? []) };
   } catch {
     return fallbackState;
@@ -818,6 +823,19 @@ function SettingsScreen({
   );
 }
 
+function SaveToast({ toast }: { toast: ToastState | null }) {
+  return (
+    <div className={toast ? "save-toast save-toast-visible" : "save-toast"} role="status" aria-live="polite" aria-atomic="true">
+      {toast ? (
+        <>
+          <CheckCircle2 size={18} strokeWidth={2.6} aria-hidden="true" />
+          <span>{toast.message}</span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function BottomNavigation({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
   return (
     <nav className="bottom-nav" aria-label="Primary navigation">
@@ -989,19 +1007,28 @@ function MyFoodsSection({
 }: {
   recent: MyFoodEntry[];
   frequent: MyFoodEntry[];
-  onRelogFood: (entry: MyFoodEntry) => void;
+  onRelogFood: (entry: MyFoodEntry, mealName: MealName) => void;
 }) {
+  const [selectedMeal, setSelectedMeal] = useState<MealName>("Breakfast");
+
   const renderFoodCard = (entry: MyFoodEntry, label: "recent" | "frequent") => (
-    <button className="my-food-card" key={`${label}-${entry.signature}`} type="button" onClick={() => onRelogFood(entry)}>
-      <span className="my-food-title">{entry.title}</span>
-      <span className="my-food-meta">
-        {entry.calories} kcal · {entry.mealName}
-      </span>
-      <span className="my-food-macros">
-        P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
-      </span>
-      {label === "frequent" ? <span className="my-food-count">{entry.count}x</span> : null}
-    </button>
+    <article className="my-food-card" key={`${label}-${entry.signature}`}>
+      <div className="my-food-card-copy">
+        <span className="my-food-title">{entry.title}</span>
+        <span className="my-food-meta">
+          {entry.calories} kcal · Last: {entry.mealName}
+        </span>
+        <span className="my-food-macros">
+          P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+        </span>
+      </div>
+      <div className="my-food-card-actions">
+        {label === "frequent" ? <span className="my-food-count">{entry.count}x</span> : null}
+        <button className="my-food-add-button" type="button" onClick={() => onRelogFood(entry, selectedMeal)}>
+          Add
+        </button>
+      </div>
+    </article>
   );
 
   return (
@@ -1009,10 +1036,28 @@ function MyFoodsSection({
       <div className="my-foods-header">
         <span>Saved foods</span>
         <h1>My Foods</h1>
-        <p>Tap any card to log it again for the selected day.</p>
+        <p>Pick today's meal, then add foods from your history.</p>
       </div>
 
       {recent.length === 0 && frequent.length === 0 ? <p className="my-foods-empty">Foods you log will appear here automatically.</p> : null}
+
+      {recent.length > 0 || frequent.length > 0 ? (
+        <section className="my-foods-meal-picker" aria-label="Choose meal for saved foods">
+          <p>Log to</p>
+          <div>
+            {mealOrder.map((meal) => (
+              <button
+                className={selectedMeal === meal.name ? "meal-pill meal-pill-active" : "meal-pill"}
+                key={meal.name}
+                type="button"
+                onClick={() => setSelectedMeal(meal.name)}
+              >
+                {meal.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {recent.length > 0 ? (
         <div className="my-foods-group">
@@ -1417,8 +1462,10 @@ export function App() {
   const [geminiApiKey, setGeminiApiKey] = useState(getStoredGeminiApiKey);
   const [expandedMeal, setExpandedMeal] = useState<MealName | null>(null);
   const [activeView, setActiveView] = useState<AppView>("home");
+  const [toast, setToast] = useState<ToastState | null>(null);
   const frameRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const { profile, logs } = storedState;
   const dateIndicator = getDateIndicator(selectedDateKey);
 
@@ -1436,6 +1483,15 @@ export function App() {
     frameRef.current?.scrollTo({ top: 0, behavior: "auto" });
     contentRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [activeView]);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const selectedLogs = useMemo(() => logs.filter((log) => log.dateKey === selectedDateKey), [logs, selectedDateKey]);
 
@@ -1494,6 +1550,7 @@ export function App() {
   };
 
   const openEditSheet = (log: MealLog) => {
+    setActiveView("home");
     setDraft({
       editingId: log.id,
       mealName: log.mealName,
@@ -1509,21 +1566,31 @@ export function App() {
     });
   };
 
+  const showToast = (message: string) => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({ id: Date.now(), message });
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2600);
+  };
+
   const deleteFood = (id: string) => {
     setStoredState((current) => ({
       ...current,
       version: CURRENT_STORAGE_VERSION,
       logs: current.logs.filter((log) => log.id !== id),
     }));
+    showToast("Food deleted");
   };
 
-  const relogFood = (entry: MyFoodEntry) => {
+  const relogFood = (entry: MyFoodEntry, mealName: MealName) => {
     const nextLog: MealLog = {
       id: makeId(),
       kind: "meal",
       dateKey: selectedDateKey,
       loggedAt: new Date().toISOString(),
-      mealName: entry.mealName,
+      mealName,
       title: entry.title,
       calories: entry.calories,
       protein: entry.protein,
@@ -1536,7 +1603,8 @@ export function App() {
       version: CURRENT_STORAGE_VERSION,
       logs: [...current.logs, nextLog],
     }));
-    setExpandedMeal(entry.mealName);
+    setExpandedMeal(mealName);
+    showToast(`Added to ${mealName}`);
   };
 
   const saveLog = (keepOpen = false) => {
@@ -1568,6 +1636,7 @@ export function App() {
         ),
       }));
       setDraft(null);
+      showToast("Food saved");
       return;
     }
 
@@ -1607,6 +1676,7 @@ export function App() {
     }));
     setExpandedMeal(draft.mealName);
     setDraft(keepOpen ? makeEmptyLogDraft(draft.mealName) : null);
+    showToast(keepOpen ? `Added to ${draft.mealName}` : "Food logged");
   };
 
   const saveTargets = ({ calorieGoal, macroGoals }: ReturnType<typeof goalsFromTargetDraft>) => {
@@ -1623,6 +1693,7 @@ export function App() {
           }
         : current,
     );
+    showToast("Daily targets saved");
   };
 
   return (
@@ -1681,16 +1752,19 @@ export function App() {
               onSaveApiKey={(apiKey) => {
                 saveGeminiApiKey(apiKey);
                 setGeminiApiKey(apiKey.trim());
+                showToast("API key saved");
               }}
               onClearApiKey={() => {
                 clearGeminiApiKey();
                 setGeminiApiKey("");
+                showToast("API key cleared");
               }}
             />
           )}
         </div>
 
         <BottomNavigation activeView={activeView} onChange={setActiveView} />
+        <SaveToast toast={toast} />
       </section>
     </main>
   );

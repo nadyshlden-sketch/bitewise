@@ -72,6 +72,7 @@ button {
 }
 
 .phone-frame {
+  position: relative;
   width: min(100vw, var(--frame-max));
   height: 100svh;
   display: flex;
@@ -497,6 +498,54 @@ button {
   background: var(--white);
 }
 
+.my-foods-meal-picker {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  margin: 0 calc(var(--edge) * -1);
+  padding: 10px var(--edge);
+  background: rgba(238, 238, 238, 0.94);
+  backdrop-filter: blur(12px);
+}
+
+.my-foods-meal-picker p {
+  margin: 0;
+  color: rgba(5, 5, 5, 0.64);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.my-foods-meal-picker > div {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.my-foods-meal-picker > div::-webkit-scrollbar {
+  display: none;
+}
+
+.meal-pill {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-radius: 999px;
+  background: var(--white);
+  color: rgba(5, 5, 5, 0.62);
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.meal-pill-active {
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
+}
+
 .my-foods-group {
   display: grid;
   gap: 8px;
@@ -523,19 +572,31 @@ button {
 }
 
 .my-food-card {
-  position: relative;
   flex: 0 0 156px;
-  min-height: 104px;
-  display: grid;
-  align-content: start;
-  gap: 5px;
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
   scroll-snap-align: start;
   padding: 13px;
   border-radius: 18px;
   background: var(--white);
   color: var(--ink);
   text-align: left;
-  cursor: pointer;
+}
+
+.my-food-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.my-food-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .my-food-title {
@@ -558,9 +619,6 @@ button {
 }
 
 .my-food-count {
-  position: absolute;
-  right: 10px;
-  bottom: 9px;
   min-width: 30px;
   border-radius: 999px;
   background: var(--primary-cta);
@@ -570,6 +628,18 @@ button {
   font-weight: 800;
   line-height: 1;
   text-align: center;
+}
+
+.my-food-add-button {
+  min-height: 34px;
+  flex: 1 1 auto;
+  border-radius: 999px;
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .meal-card {
@@ -1430,6 +1500,38 @@ button {
   color: var(--ink);
 }
 
+.save-toast {
+  position: absolute;
+  left: var(--edge);
+  right: var(--edge);
+  bottom: calc(84px + max(14px, env(safe-area-inset-bottom)));
+  z-index: 8;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--meadow-10);
+  color: var(--white);
+  padding: 0 16px;
+  box-shadow: 0 16px 34px rgba(20, 31, 25, 0.22);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.save-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @media (hover: hover) {
   .icon-button:hover,
   .add-meal-button:hover,
@@ -1478,6 +1580,11 @@ button {
 
   .my-food-card {
     min-width: 0;
+  }
+
+  .my-foods-meal-picker {
+    margin: 0;
+    padding: 10px 0;
   }
 
   .meal-sheet {
