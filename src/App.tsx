@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useState } from "react";
 import {
   clearGeminiApiKey,
@@ -164,6 +164,24 @@ const formatDateKey = (dateKey: string) =>
     day: "numeric",
   }).format(dateFromKey(dateKey));
 
+const getDateIndicator = (dateKey: string) => {
+  const today = toDateKey();
+
+  if (dateKey === today) {
+    return "Today";
+  }
+
+  if (dateKey === moveDateKey(today, -1)) {
+    return "Yesterday";
+  }
+
+  if (dateKey === moveDateKey(today, 1)) {
+    return "Tomorrow";
+  }
+
+  return "";
+};
+
 const formatTime = (isoDate: string) =>
   new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
@@ -193,10 +211,29 @@ function loadStoredState(): StoredState {
     }
 
     const profile = parsed.profile ? { ...parsed.profile, ...calculateNutritionTargets(parsed.profile) } : null;
-    return { ...fallbackState, ...parsed, profile };
+    return { ...fallbackState, ...parsed, profile, logs: normalizeStoredLogs(parsed.logs ?? []) };
   } catch {
     return fallbackState;
   }
+}
+
+function normalizeStoredLogs(logs: MealLog[]) {
+  return logs.flatMap((log) => {
+    if (!log.aiItems?.length) {
+      return [log];
+    }
+
+    return log.aiItems.map((item, index) => ({
+      ...log,
+      id: `${log.id}-food-${index}`,
+      title: `${item.quantity} ${item.name}`.trim(),
+      calories: item.calories,
+      protein: item.protein,
+      carbs: item.carbs,
+      fat: item.fat,
+      aiItems: undefined,
+    }));
+  });
 }
 
 function nutritionInputFromDraft(draft: OnboardingDraft): NutritionInput {
@@ -569,51 +606,40 @@ function CalorieArc({
 
 function MealCard({
   meal,
+  isExpanded,
+  onToggle,
   onLogMeal,
   onEditFood,
   onDeleteFood,
 }: {
   meal: MealSummary;
+  isExpanded: boolean;
+  onToggle: () => void;
   onLogMeal: (mealName: MealName) => void;
   onEditFood: (log: MealLog) => void;
   onDeleteFood: (id: string) => void;
 }) {
   return (
-    <article className={`meal-card meal-card-${meal.tone}`}>
-      <div className="meal-content">
+    <article className={`meal-card meal-card-${meal.tone} ${isExpanded ? "meal-card-expanded" : ""}`}>
+      <button
+        className="meal-toggle"
+        type="button"
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? "Collapse" : "Expand"} ${meal.name}`}
+        onClick={onToggle}
+      >
         <span className="meal-copy">
           <span className="meal-title">
             {meal.name}
-            {meal.calories > 0 ? <span> {meal.calories} kcal</span> : null}
+            {isExpanded ? (
+              <ChevronUp size={16} strokeWidth={2.5} aria-hidden="true" />
+            ) : (
+              <ChevronDown size={16} strokeWidth={2.5} aria-hidden="true" />
+            )}
           </span>
-          {meal.items.length > 0 ? (
-            <span className="meal-items">
-              {meal.items.map((item) => (
-                <span className="food-row" key={item.id}>
-                  <span className="food-copy">
-                    <span>
-                      {item.title} {item.calories} kcal · {formatTime(item.loggedAt)}
-                    </span>
-                    {item.aiItems?.length ? (
-                      <span className="food-breakdown">
-                        {item.aiItems.map((food) => `${food.quantity} ${food.name} ${food.calories} kcal`).join(" + ")}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="food-actions">
-                    <button className="food-action-button" type="button" aria-label={`Edit ${item.title}`} onClick={() => onEditFood(item)}>
-                      <Pencil size={14} strokeWidth={2.4} aria-hidden="true" />
-                    </button>
-                    <button className="food-action-button" type="button" aria-label={`Delete ${item.title}`} onClick={() => onDeleteFood(item.id)}>
-                      <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
-                    </button>
-                  </span>
-                </span>
-              ))}
-            </span>
-          ) : null}
+          <span className="meal-calories">{meal.calories > 0 ? `${meal.calories} kcal` : "0 kcal"}</span>
         </span>
-      </div>
+      </button>
 
       <button
         className="add-meal-button"
@@ -623,6 +649,33 @@ function MealCard({
       >
         <Plus size={36} strokeWidth={2.4} aria-hidden="true" />
       </button>
+
+      {isExpanded ? (
+        <div className="meal-dropdown" aria-label={`${meal.name} foods`}>
+          {meal.items.length > 0 ? (
+            meal.items.map((item) => (
+              <div className="food-row" key={item.id}>
+                <span className="food-copy">
+                  <span className="food-title">{item.title}</span>
+                  <span className="food-breakdown">
+                    {item.calories} kcal · P {item.protein}g · C {item.carbs}g · F {item.fat}g · {formatTime(item.loggedAt)}
+                  </span>
+                </span>
+                <span className="food-actions">
+                  <button className="food-action-button" type="button" aria-label={`Edit ${item.title}`} onClick={() => onEditFood(item)}>
+                    <Pencil size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                  <button className="food-action-button" type="button" aria-label={`Delete ${item.title}`} onClick={() => onDeleteFood(item.id)}>
+                    <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="empty-meal">No foods logged</p>
+          )}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -850,7 +903,9 @@ export function App() {
   const [draft, setDraft] = useState<LogDraft | null>(null);
   const [geminiApiKey, setGeminiApiKey] = useState(getStoredGeminiApiKey);
   const [showApiKeySheet, setShowApiKeySheet] = useState(false);
+  const [expandedMeal, setExpandedMeal] = useState<MealName | null>(null);
   const { profile, logs } = storedState;
+  const dateIndicator = getDateIndicator(selectedDateKey);
 
   useEffect(() => {
     try {
@@ -918,6 +973,7 @@ export function App() {
   }
 
   const openLogSheet = (mealName: MealName = "Breakfast") => {
+    setExpandedMeal(mealName);
     setDraft({
       editingId: null,
       mealName,
@@ -943,18 +999,9 @@ export function App() {
       carbs: String(log.carbs),
       fat: String(log.fat),
       aiInput: "",
-      aiResult: log.aiItems
-        ? {
-            title: log.title,
-            items: log.aiItems,
-            totalCalories: log.calories,
-            totalProtein: log.protein,
-            totalCarbs: log.carbs,
-            totalFat: log.fat,
-          }
-        : null,
+      aiResult: null,
       aiError: "",
-      aiStatus: log.aiItems ? "ready" : "idle",
+      aiStatus: "idle",
     });
   };
 
@@ -1000,25 +1047,40 @@ export function App() {
     }
 
     const timestamp = new Date().toISOString();
-    const nextLog: MealLog = {
-      id: makeId(),
-      kind: "meal",
-      dateKey: selectedDateKey,
-      loggedAt: timestamp,
-      mealName: draft.mealName,
-      title,
-      calories,
-      protein: addNumber(draft.protein),
-      carbs: addNumber(draft.carbs),
-      fat: addNumber(draft.fat),
-      aiItems: draft.aiResult?.items,
-    };
+    const nextLogs: MealLog[] = draft.aiResult?.items.length
+      ? draft.aiResult.items.map((item) => ({
+          id: makeId(),
+          kind: "meal",
+          dateKey: selectedDateKey,
+          loggedAt: timestamp,
+          mealName: draft.mealName,
+          title: `${item.quantity} ${item.name}`.trim(),
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+        }))
+      : [
+          {
+            id: makeId(),
+            kind: "meal",
+            dateKey: selectedDateKey,
+            loggedAt: timestamp,
+            mealName: draft.mealName,
+            title,
+            calories,
+            protein: addNumber(draft.protein),
+            carbs: addNumber(draft.carbs),
+            fat: addNumber(draft.fat),
+          },
+        ];
 
     setStoredState((current) => ({
       ...current,
       version: CURRENT_STORAGE_VERSION,
-      logs: [...current.logs, nextLog],
+      logs: [...current.logs, ...nextLogs],
     }));
+    setExpandedMeal(draft.mealName);
     setDraft(null);
   };
 
@@ -1029,7 +1091,10 @@ export function App() {
           <IconButton label="Previous day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, -1))}>
             <ArrowLeft size={30} strokeWidth={3} aria-hidden="true" />
           </IconButton>
-          <h1>{formatDateKey(selectedDateKey)}</h1>
+          <div className="date-copy">
+            {dateIndicator ? <span>{dateIndicator}</span> : null}
+            <h1>{formatDateKey(selectedDateKey)}</h1>
+          </div>
           <IconButton label="Next day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, 1))}>
             <ArrowRight size={30} strokeWidth={3} aria-hidden="true" />
           </IconButton>
@@ -1042,6 +1107,8 @@ export function App() {
             <MealCard
               key={meal.name}
               meal={meal}
+              isExpanded={expandedMeal === meal.name}
+              onToggle={() => setExpandedMeal((current) => (current === meal.name ? null : meal.name))}
               onLogMeal={(mealName) => openLogSheet(mealName)}
               onEditFood={openEditSheet}
               onDeleteFood={deleteFood}
