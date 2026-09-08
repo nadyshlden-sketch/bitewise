@@ -559,11 +559,12 @@ button {
 .my-foods-row {
   display: flex;
   gap: 9px;
-  margin: 0 calc(var(--edge) * -1);
-  padding: 0 var(--edge) 5px;
+  margin: 0;
+  padding: 0 3px 5px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
+  scroll-padding-inline: 3px;
   scrollbar-width: none;
 }
 
@@ -572,15 +573,15 @@ button {
 }
 
 .my-food-card {
-  flex: 0 0 156px;
-  min-height: 128px;
+  flex: 0 0 min(148px, calc((100vw - (var(--edge) * 2) - 14px) / 2));
+  min-height: 124px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 10px;
   scroll-snap-align: start;
-  padding: 13px;
-  border-radius: 18px;
+  padding: 12px;
+  border-radius: 16px;
   background: var(--white);
   color: var(--ink);
   text-align: left;
