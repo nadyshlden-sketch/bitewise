@@ -1418,6 +1418,7 @@ export function App() {
   const [expandedMeal, setExpandedMeal] = useState<MealName | null>(null);
   const [activeView, setActiveView] = useState<AppView>("home");
   const frameRef = useRef<HTMLElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const { profile, logs } = storedState;
   const dateIndicator = getDateIndicator(selectedDateKey);
 
@@ -1433,6 +1434,7 @@ export function App() {
 
   useEffect(() => {
     frameRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    contentRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [activeView]);
 
   const selectedLogs = useMemo(() => logs.filter((log) => log.dateKey === selectedDateKey), [logs, selectedDateKey]);
@@ -1626,65 +1628,67 @@ export function App() {
   return (
     <main className="app-shell">
       <section className="phone-frame" aria-label="Bitewise home" ref={frameRef}>
-        {activeView === "home" ? (
-          <>
-            <header className="date-header">
-              <IconButton label="Previous day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, -1))}>
-                <ArrowLeft size={30} strokeWidth={3} aria-hidden="true" />
-              </IconButton>
-              <div className="date-copy">
-                {dateIndicator ? <span>{dateIndicator}</span> : null}
-                <h1>{formatDateKey(selectedDateKey)}</h1>
-              </div>
-              <IconButton label="Next day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, 1))}>
-                <ArrowRight size={30} strokeWidth={3} aria-hidden="true" />
-              </IconButton>
-            </header>
+        <div className="view-content" ref={contentRef}>
+          {activeView === "home" ? (
+            <>
+              <header className="date-header">
+                <IconButton label="Previous day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, -1))}>
+                  <ArrowLeft size={30} strokeWidth={3} aria-hidden="true" />
+                </IconButton>
+                <div className="date-copy">
+                  {dateIndicator ? <span>{dateIndicator}</span> : null}
+                  <h1>{formatDateKey(selectedDateKey)}</h1>
+                </div>
+                <IconButton label="Next day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, 1))}>
+                  <ArrowRight size={30} strokeWidth={3} aria-hidden="true" />
+                </IconButton>
+              </header>
 
-            <CalorieArc calorieGoal={profile.calorieGoal} consumed={consumed} macros={macros} />
+              <CalorieArc calorieGoal={profile.calorieGoal} consumed={consumed} macros={macros} />
 
-            {draft ? (
-              <LogSheet
-                draft={draft}
-                setDraft={setDraft}
-                onClose={() => setDraft(null)}
-                onSave={saveLog}
-                apiKey={geminiApiKey}
-                onNeedApiKey={() => setActiveView("settings")}
-              />
-            ) : null}
-
-            <div className="meal-list" aria-label="Meals">
-              {mealSummaries.map((meal) => (
-                <MealCard
-                  key={meal.name}
-                  meal={meal}
-                  isExpanded={expandedMeal === meal.name}
-                  onToggle={() => setExpandedMeal((current) => (current === meal.name ? null : meal.name))}
-                  onLogMeal={(mealName) => openLogSheet(mealName)}
-                  onEditFood={openEditSheet}
-                  onDeleteFood={deleteFood}
+              {draft ? (
+                <LogSheet
+                  draft={draft}
+                  setDraft={setDraft}
+                  onClose={() => setDraft(null)}
+                  onSave={saveLog}
+                  apiKey={geminiApiKey}
+                  onNeedApiKey={() => setActiveView("settings")}
                 />
-              ))}
-            </div>
-          </>
-        ) : activeView === "foods" ? (
-          <MyFoodsSection recent={myFoods.recent} frequent={myFoods.frequent} onRelogFood={relogFood} />
-        ) : (
-          <SettingsScreen
-            profile={profile}
-            savedKey={geminiApiKey}
-            onSaveTargets={saveTargets}
-            onSaveApiKey={(apiKey) => {
-              saveGeminiApiKey(apiKey);
-              setGeminiApiKey(apiKey.trim());
-            }}
-            onClearApiKey={() => {
-              clearGeminiApiKey();
-              setGeminiApiKey("");
-            }}
-          />
-        )}
+              ) : null}
+
+              <div className="meal-list" aria-label="Meals">
+                {mealSummaries.map((meal) => (
+                  <MealCard
+                    key={meal.name}
+                    meal={meal}
+                    isExpanded={expandedMeal === meal.name}
+                    onToggle={() => setExpandedMeal((current) => (current === meal.name ? null : meal.name))}
+                    onLogMeal={(mealName) => openLogSheet(mealName)}
+                    onEditFood={openEditSheet}
+                    onDeleteFood={deleteFood}
+                  />
+                ))}
+              </div>
+            </>
+          ) : activeView === "foods" ? (
+            <MyFoodsSection recent={myFoods.recent} frequent={myFoods.frequent} onRelogFood={relogFood} />
+          ) : (
+            <SettingsScreen
+              profile={profile}
+              savedKey={geminiApiKey}
+              onSaveTargets={saveTargets}
+              onSaveApiKey={(apiKey) => {
+                saveGeminiApiKey(apiKey);
+                setGeminiApiKey(apiKey.trim());
+              }}
+              onClearApiKey={() => {
+                clearGeminiApiKey();
+                setGeminiApiKey("");
+              }}
+            />
+          )}
+        </div>
 
         <BottomNavigation activeView={activeView} onChange={setActiveView} />
       </section>

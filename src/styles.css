@@ -19,6 +19,7 @@
   --page-bg: #eeeeee;
   --card-radius: 21px;
   --edge: clamp(20px, 8.2vw, 34px);
+  --frame-max: 414px;
 }
 
 * {
@@ -71,16 +72,22 @@ button {
 }
 
 .phone-frame {
-  width: min(100vw, 414px);
-  min-height: 100svh;
+  width: min(100vw, var(--frame-max));
+  height: 100svh;
   display: flex;
   flex-direction: column;
   padding: max(55px, env(safe-area-inset-top)) var(--edge) max(14px, env(safe-area-inset-bottom));
   background: var(--page-bg);
   border-radius: 0;
+  overflow: hidden;
+}
+
+.view-content {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  scroll-padding-bottom: 20px;
 }
 
 .onboarding-frame {
@@ -438,13 +445,11 @@ button {
   gap: 10px;
   flex: 1 1 auto;
   min-height: 0;
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
 }
 
 .my-foods {
   display: grid;
   gap: 16px;
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
 }
 
 .my-foods-header {
@@ -1284,7 +1289,6 @@ button {
 .settings-screen {
   display: grid;
   gap: 16px;
-  padding-bottom: 18px;
 }
 
 .settings-header {
@@ -1393,14 +1397,13 @@ button {
 }
 
 .bottom-nav {
-  position: sticky;
-  bottom: max(10px, env(safe-area-inset-bottom));
+  flex: 0 0 auto;
   z-index: 4;
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  margin-top: auto;
+  margin-top: 12px;
   padding: 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
@@ -1458,10 +1461,11 @@ button {
 @media (min-width: 768px) {
   :root {
     --edge: 40px;
+    --frame-max: 640px;
   }
 
   .phone-frame {
-    width: min(100vw, 640px);
+    width: min(100vw, var(--frame-max));
   }
 
   .my-foods-row {
@@ -1487,8 +1491,12 @@ button {
 }
 
 @media (min-width: 1120px) {
+  :root {
+    --frame-max: 720px;
+  }
+
   .phone-frame {
-    width: min(100vw, 720px);
+    width: min(100vw, var(--frame-max));
   }
 
   .my-foods-row {
