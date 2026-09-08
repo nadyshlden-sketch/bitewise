@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Home, KeyRound, Pencil, Plus, Settings as SettingsIcon, Trash2, X } from "lucide-react";
 import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useState } from "react";
 import { findFoodDatabaseMatches, FoodDatabaseEntry } from "./data/foodDatabase";
 import {
@@ -100,6 +100,15 @@ type ApiKeyDraft = {
   error: string;
 };
 
+type TargetDraft = {
+  calories: string;
+  protein: string;
+  carbs: string;
+  fat: string;
+};
+
+type AppView = "home" | "settings";
+
 type PortionUnit = "serving" | "g";
 
 type SelectedDatabaseFood = {
@@ -147,6 +156,8 @@ const fallbackMacroGoals: Record<MacroLabel, number> = {
   Carbs: 175,
   Fat: 60,
 };
+
+const macrosOrder: MacroLabel[] = ["Protein", "Carbs", "Fat"];
 
 const toDateKey = (date = new Date()) => {
   const year = date.getFullYear();
@@ -343,6 +354,31 @@ function calculateNutritionTargets(input: NutritionInput) {
   };
 }
 
+function targetDraftFromGoals(calorieGoal: number, macroGoals: Record<MacroLabel, number>): TargetDraft {
+  return {
+    calories: String(calorieGoal),
+    protein: String(macroGoals.Protein),
+    carbs: String(macroGoals.Carbs),
+    fat: String(macroGoals.Fat),
+  };
+}
+
+function goalsFromTargetDraft(draft: TargetDraft) {
+  return {
+    calorieGoal: addNumber(draft.calories),
+    macroGoals: {
+      Protein: addNumber(draft.protein),
+      Carbs: addNumber(draft.carbs),
+      Fat: addNumber(draft.fat),
+    },
+  };
+}
+
+function targetDraftIsValid(draft: TargetDraft) {
+  const targets = goalsFromTargetDraft(draft);
+  return targets.calorieGoal > 0 && macrosOrder.every((macro) => targets.macroGoals[macro] > 0);
+}
+
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
     <button className="icon-button" type="button" aria-label={label} onClick={onClick}>
@@ -391,6 +427,8 @@ function OnboardingScreen({ onComplete }: { onComplete: (profile: Profile) => vo
     goal: "lose",
     activityLevel: "light",
   });
+  const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [targetOverride, setTargetOverride] = useState<TargetDraft | null>(null);
 
   const previewTargets = useMemo(() => {
     const hasEnoughData = addNumber(draft.age) > 0 && addNumber(draft.heightCm) > 0 && addNumber(draft.weightKg) > 0;
@@ -401,15 +439,31 @@ function OnboardingScreen({ onComplete }: { onComplete: (profile: Profile) => vo
           macroGoals: fallbackMacroGoals,
         };
   }, [draft]);
+  const displayedTargets = targetOverride ? goalsFromTargetDraft(targetOverride) : previewTargets;
 
   const canSave =
     draft.name.trim().length > 0 &&
     addNumber(draft.age) >= 13 &&
     addNumber(draft.heightCm) > 0 &&
-    addNumber(draft.weightKg) > 0;
+    addNumber(draft.weightKg) > 0 &&
+    (!targetOverride || targetDraftIsValid(targetOverride));
 
   const updateDraft = (next: Partial<OnboardingDraft>) => {
     setDraft((current) => ({ ...current, ...next }));
+  };
+
+  const startEditingTargets = () => {
+    setTargetOverride(targetDraftFromGoals(displayedTargets.calorieGoal, displayedTargets.macroGoals));
+    setIsEditingTargets(true);
+  };
+
+  const updateTargetOverride = (next: Partial<TargetDraft>) => {
+    setTargetOverride((current) => ({ ...(current ?? targetDraftFromGoals(previewTargets.calorieGoal, previewTargets.macroGoals)), ...next }));
+  };
+
+  const useFormulaTargets = () => {
+    setTargetOverride(null);
+    setIsEditingTargets(false);
   };
 
   const submitProfile = (event: FormEvent<HTMLFormElement>) => {
@@ -426,8 +480,8 @@ function OnboardingScreen({ onComplete }: { onComplete: (profile: Profile) => vo
       weightKg: addNumber(draft.weightKg),
       goal: draft.goal,
       activityLevel: draft.activityLevel,
-      calorieGoal: previewTargets.calorieGoal,
-      macroGoals: previewTargets.macroGoals,
+      calorieGoal: displayedTargets.calorieGoal,
+      macroGoals: displayedTargets.macroGoals,
     });
   };
 
@@ -440,18 +494,46 @@ function OnboardingScreen({ onComplete }: { onComplete: (profile: Profile) => vo
         </header>
 
         <section className="onboarding-summary" aria-label="Estimated daily goals">
+          <button className="summary-edit-button" type="button" aria-label="Edit daily goals" onClick={startEditingTargets}>
+            <Pencil size={16} strokeWidth={2.5} aria-hidden="true" />
+          </button>
           <div>
-            <span className="onboarding-calories">{previewTargets.calorieGoal}</span>
+            {isEditingTargets && targetOverride ? (
+              <label className="target-inline-field">
+                kcal
+                <input
+                  inputMode="numeric"
+                  value={targetOverride.calories}
+                  onChange={(event) => updateTargetOverride({ calories: event.target.value })}
+                />
+              </label>
+            ) : (
+              <span className="onboarding-calories">{displayedTargets.calorieGoal}</span>
+            )}
             <p>kcal daily goal</p>
           </div>
           <div className="onboarding-macro-grid" aria-label="Estimated macro goals">
-            {(["Protein", "Carbs", "Fat"] as MacroLabel[]).map((macro) => (
+            {macrosOrder.map((macro) => (
               <span key={macro}>
-                <strong>{previewTargets.macroGoals[macro]}g</strong>
+                {isEditingTargets && targetOverride ? (
+                  <input
+                    aria-label={`${macro} goal`}
+                    inputMode="numeric"
+                    value={targetOverride[macro.toLowerCase() as keyof TargetDraft]}
+                    onChange={(event) => updateTargetOverride({ [macro.toLowerCase()]: event.target.value } as Partial<TargetDraft>)}
+                  />
+                ) : (
+                  <strong>{displayedTargets.macroGoals[macro]}g</strong>
+                )}
                 <small>{macro}</small>
               </span>
             ))}
           </div>
+          {isEditingTargets ? (
+            <button className="formula-button" type="button" onClick={useFormulaTargets}>
+              Use formula
+            </button>
+          ) : null}
         </section>
 
         <form className="onboarding-form" onSubmit={submitProfile}>
@@ -529,44 +611,98 @@ function OnboardingScreen({ onComplete }: { onComplete: (profile: Profile) => vo
   );
 }
 
-function ApiKeySheet({
+function SettingsScreen({
+  profile,
   savedKey,
-  onSave,
-  onClear,
-  onClose,
+  onSaveTargets,
+  onSaveApiKey,
+  onClearApiKey,
 }: {
+  profile: Profile;
   savedKey: string;
-  onSave: (apiKey: string) => void;
-  onClear: () => void;
-  onClose: () => void;
+  onSaveTargets: (targets: ReturnType<typeof goalsFromTargetDraft>) => void;
+  onSaveApiKey: (apiKey: string) => void;
+  onClearApiKey: () => void;
 }) {
-  const [draft, setDraft] = useState<ApiKeyDraft>({ value: "", error: "" });
+  const [targets, setTargets] = useState(() => targetDraftFromGoals(profile.calorieGoal, profile.macroGoals));
+  const [apiDraft, setApiDraft] = useState<ApiKeyDraft>({ value: "", error: "" });
+  const [targetsSaved, setTargetsSaved] = useState(false);
   const hasSavedKey = savedKey.length > 0;
 
-  const submitKey = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const nextKey = draft.value.trim();
+  useEffect(() => {
+    setTargets(targetDraftFromGoals(profile.calorieGoal, profile.macroGoals));
+  }, [profile.calorieGoal, profile.macroGoals]);
 
-    if (!nextKey) {
-      setDraft((current) => ({ ...current, error: "Paste your Gemini API key first." }));
+  const updateTargets = (next: Partial<TargetDraft>) => {
+    setTargetsSaved(false);
+    setTargets((current) => ({ ...current, ...next }));
+  };
+
+  const submitTargets = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!targetDraftIsValid(targets)) {
       return;
     }
 
-    onSave(nextKey);
+    onSaveTargets(goalsFromTargetDraft(targets));
+    setTargetsSaved(true);
+  };
+
+  const submitKey = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextKey = apiDraft.value.trim();
+
+    if (!nextKey) {
+      setApiDraft((current) => ({ ...current, error: "Paste your Gemini API key first." }));
+      return;
+    }
+
+    onSaveApiKey(nextKey);
+    setApiDraft({ value: "", error: "" });
   };
 
   return (
-    <div className="sheet-backdrop" role="presentation" onMouseDown={onClose}>
-      <form className="meal-sheet api-key-sheet" aria-label="Gemini API key" onSubmit={submitKey} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="sheet-handle" aria-hidden="true" />
-        <div className="sheet-header">
-          <div>
-            <p>Gemini</p>
-            <h2>API key</h2>
-          </div>
-          <button className="sheet-close" type="button" aria-label="Close API key setup" onClick={onClose}>
-            <X size={22} strokeWidth={2.5} aria-hidden="true" />
-          </button>
+    <section className="settings-screen" aria-label="Settings">
+      <header className="settings-header">
+        <p>Settings</p>
+        <h1>Goals and AI</h1>
+      </header>
+
+      <form className="settings-card" onSubmit={submitTargets}>
+        <div className="settings-card-header">
+          <span>Daily targets</span>
+          {targetsSaved ? <small>Saved</small> : null}
+        </div>
+
+        <label className="field-label">
+          Calories
+          <input inputMode="numeric" value={targets.calories} onChange={(event) => updateTargets({ calories: event.target.value })} />
+        </label>
+
+        <div className="field-grid">
+          <label className="field-label">
+            Protein
+            <input inputMode="numeric" value={targets.protein} onChange={(event) => updateTargets({ protein: event.target.value })} />
+          </label>
+          <label className="field-label">
+            Carbs
+            <input inputMode="numeric" value={targets.carbs} onChange={(event) => updateTargets({ carbs: event.target.value })} />
+          </label>
+          <label className="field-label">
+            Fat
+            <input inputMode="numeric" value={targets.fat} onChange={(event) => updateTargets({ fat: event.target.value })} />
+          </label>
+        </div>
+
+        <button className="save-meal-button" type="submit" disabled={!targetDraftIsValid(targets)}>
+          Save targets
+        </button>
+      </form>
+
+      <form className="settings-card" onSubmit={submitKey}>
+        <div className="settings-card-header">
+          <span>Gemini API key</span>
+          <KeyRound size={18} strokeWidth={2.4} aria-hidden="true" />
         </div>
 
         {hasSavedKey ? <p className="key-status">Saved key: {maskGeminiApiKey(savedKey)}</p> : null}
@@ -574,29 +710,47 @@ function ApiKeySheet({
         <label className="field-label">
           {hasSavedKey ? "Replace key" : "API key"}
           <input
-            autoFocus
             autoComplete="off"
-            value={draft.value}
-            onChange={(event) => setDraft({ value: event.target.value, error: "" })}
+            value={apiDraft.value}
+            onChange={(event) => setApiDraft({ value: event.target.value, error: "" })}
             placeholder="Paste Gemini API key"
             type="password"
           />
         </label>
 
-        {draft.error ? <p className="form-error">{draft.error}</p> : null}
+        {apiDraft.error ? <p className="form-error">{apiDraft.error}</p> : null}
 
         <div className="key-actions">
           <button className="save-meal-button" type="submit">
             {hasSavedKey ? "Replace key" : "Save key"}
           </button>
           {hasSavedKey ? (
-            <button className="clear-key-button" type="button" onClick={onClear}>
+            <button className="clear-key-button" type="button" onClick={onClearApiKey}>
               Clear key
             </button>
           ) : null}
         </div>
       </form>
-    </div>
+    </section>
+  );
+}
+
+function BottomNavigation({ activeView, onChange }: { activeView: AppView; onChange: (view: AppView) => void }) {
+  return (
+    <nav className="bottom-nav" aria-label="Primary navigation">
+      <button className={activeView === "home" ? "bottom-nav-item bottom-nav-item-active" : "bottom-nav-item"} type="button" onClick={() => onChange("home")}>
+        <Home size={21} strokeWidth={2.5} aria-hidden="true" />
+        <span>Home</span>
+      </button>
+      <button
+        className={activeView === "settings" ? "bottom-nav-item bottom-nav-item-active" : "bottom-nav-item"}
+        type="button"
+        onClick={() => onChange("settings")}
+      >
+        <SettingsIcon size={21} strokeWidth={2.5} aria-hidden="true" />
+        <span>Settings</span>
+      </button>
+    </nav>
   );
 }
 
@@ -1125,8 +1279,8 @@ export function App() {
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
   const [draft, setDraft] = useState<LogDraft | null>(null);
   const [geminiApiKey, setGeminiApiKey] = useState(getStoredGeminiApiKey);
-  const [showApiKeySheet, setShowApiKeySheet] = useState(false);
   const [expandedMeal, setExpandedMeal] = useState<MealName | null>(null);
+  const [activeView, setActiveView] = useState<AppView>("home");
   const { profile, logs } = storedState;
   const dateIndicator = getDateIndicator(selectedDateKey);
 
@@ -1288,66 +1442,85 @@ export function App() {
     setDraft(keepOpen ? makeEmptyLogDraft(draft.mealName) : null);
   };
 
+  const saveTargets = ({ calorieGoal, macroGoals }: ReturnType<typeof goalsFromTargetDraft>) => {
+    setStoredState((current) =>
+      current.profile
+        ? {
+            ...current,
+            version: CURRENT_STORAGE_VERSION,
+            profile: {
+              ...current.profile,
+              calorieGoal,
+              macroGoals,
+            },
+          }
+        : current,
+    );
+  };
+
   return (
     <main className="app-shell">
       <section className="phone-frame" aria-label="Bitewise home">
-        <header className="date-header">
-          <IconButton label="Previous day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, -1))}>
-            <ArrowLeft size={30} strokeWidth={3} aria-hidden="true" />
-          </IconButton>
-          <div className="date-copy">
-            {dateIndicator ? <span>{dateIndicator}</span> : null}
-            <h1>{formatDateKey(selectedDateKey)}</h1>
-          </div>
-          <IconButton label="Next day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, 1))}>
-            <ArrowRight size={30} strokeWidth={3} aria-hidden="true" />
-          </IconButton>
-        </header>
+        {activeView === "home" ? (
+          <>
+            <header className="date-header">
+              <IconButton label="Previous day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, -1))}>
+                <ArrowLeft size={30} strokeWidth={3} aria-hidden="true" />
+              </IconButton>
+              <div className="date-copy">
+                {dateIndicator ? <span>{dateIndicator}</span> : null}
+                <h1>{formatDateKey(selectedDateKey)}</h1>
+              </div>
+              <IconButton label="Next day" onClick={() => setSelectedDateKey((current) => moveDateKey(current, 1))}>
+                <ArrowRight size={30} strokeWidth={3} aria-hidden="true" />
+              </IconButton>
+            </header>
 
-        <CalorieArc calorieGoal={profile.calorieGoal} consumed={consumed} macros={macros} />
+            <CalorieArc calorieGoal={profile.calorieGoal} consumed={consumed} macros={macros} />
 
-        {draft ? (
-          <LogSheet
-            draft={draft}
-            setDraft={setDraft}
-            onClose={() => setDraft(null)}
-            onSave={saveLog}
-            apiKey={geminiApiKey}
-            onNeedApiKey={() => setShowApiKeySheet(true)}
+            {draft ? (
+              <LogSheet
+                draft={draft}
+                setDraft={setDraft}
+                onClose={() => setDraft(null)}
+                onSave={saveLog}
+                apiKey={geminiApiKey}
+                onNeedApiKey={() => setActiveView("settings")}
+              />
+            ) : null}
+
+            <div className="meal-list" aria-label="Meals">
+              {mealSummaries.map((meal) => (
+                <MealCard
+                  key={meal.name}
+                  meal={meal}
+                  isExpanded={expandedMeal === meal.name}
+                  onToggle={() => setExpandedMeal((current) => (current === meal.name ? null : meal.name))}
+                  onLogMeal={(mealName) => openLogSheet(mealName)}
+                  onEditFood={openEditSheet}
+                  onDeleteFood={deleteFood}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <SettingsScreen
+            profile={profile}
+            savedKey={geminiApiKey}
+            onSaveTargets={saveTargets}
+            onSaveApiKey={(apiKey) => {
+              saveGeminiApiKey(apiKey);
+              setGeminiApiKey(apiKey.trim());
+            }}
+            onClearApiKey={() => {
+              clearGeminiApiKey();
+              setGeminiApiKey("");
+            }}
           />
-        ) : null}
+        )}
 
-        <div className="meal-list" aria-label="Meals">
-          {mealSummaries.map((meal) => (
-            <MealCard
-              key={meal.name}
-              meal={meal}
-              isExpanded={expandedMeal === meal.name}
-              onToggle={() => setExpandedMeal((current) => (current === meal.name ? null : meal.name))}
-              onLogMeal={(mealName) => openLogSheet(mealName)}
-              onEditFood={openEditSheet}
-              onDeleteFood={deleteFood}
-            />
-          ))}
-        </div>
-
+        <BottomNavigation activeView={activeView} onChange={setActiveView} />
       </section>
-
-      {showApiKeySheet ? (
-        <ApiKeySheet
-          savedKey={geminiApiKey}
-          onSave={(apiKey) => {
-            saveGeminiApiKey(apiKey);
-            setGeminiApiKey(apiKey.trim());
-            setShowApiKeySheet(false);
-          }}
-          onClear={() => {
-            clearGeminiApiKey();
-            setGeminiApiKey("");
-          }}
-          onClose={() => setShowApiKeySheet(false)}
-        />
-      ) : null}
     </main>
   );
 }

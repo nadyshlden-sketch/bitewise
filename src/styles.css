@@ -72,7 +72,7 @@ button {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  padding: max(55px, env(safe-area-inset-top)) var(--edge) max(18px, env(safe-area-inset-bottom));
+  padding: max(55px, env(safe-area-inset-top)) var(--edge) max(14px, env(safe-area-inset-bottom));
   background: var(--page-bg);
   border-radius: 0;
   overflow-x: hidden;
@@ -110,13 +110,28 @@ button {
 }
 
 .onboarding-summary {
+  position: relative;
   min-height: 154px;
   display: grid;
   gap: 16px;
   align-content: center;
-  padding: 18px 24px;
+  padding: 18px 24px 20px;
   border-radius: var(--card-radius);
   background: var(--meadow-2);
+}
+
+.summary-edit-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  cursor: pointer;
 }
 
 .onboarding-calories {
@@ -146,6 +161,41 @@ button {
   background: rgba(255, 255, 255, 0.68);
 }
 
+.target-inline-field {
+  max-width: 160px;
+  display: grid;
+  gap: 5px;
+  color: rgba(5, 5, 5, 0.65);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.target-inline-field input,
+.onboarding-macro-grid input {
+  width: 100%;
+  min-height: 38px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  outline: 0;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.target-inline-field input {
+  min-height: 50px;
+  font-size: 28px;
+  text-align: left;
+  padding: 0 12px;
+}
+
+.target-inline-field input:focus,
+.onboarding-macro-grid input:focus {
+  border-color: var(--meadow-7);
+}
+
 .onboarding-macro-grid strong,
 .onboarding-macro-grid small {
   display: block;
@@ -164,6 +214,18 @@ button {
   color: rgba(5, 5, 5, 0.66);
   font-size: 11px;
   font-weight: 600;
+}
+
+.formula-button {
+  min-height: 34px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  justify-self: start;
 }
 
 .onboarding-form {
@@ -1088,6 +1150,74 @@ button {
   gap: 10px;
 }
 
+.settings-screen {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 18px;
+}
+
+.settings-header {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.settings-header p {
+  width: fit-content;
+  margin: 0;
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: var(--meadow-2);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.settings-header h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(30px, 8vw, 38px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.settings-card {
+  display: grid;
+  gap: 0;
+  padding: 15px;
+  border-radius: var(--card-radius);
+  background: var(--white);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 13px;
+  color: var(--ink);
+}
+
+.settings-card-header span {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.settings-card-header small {
+  border-radius: 999px;
+  background: var(--meadow-2);
+  color: var(--ink);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.settings-card .field-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .clear-key-button {
   min-height: 48px;
   border-radius: 999px;
@@ -1098,13 +1228,51 @@ button {
   cursor: pointer;
 }
 
+.bottom-nav {
+  position: sticky;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 4;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: auto;
+  padding: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 45px rgba(20, 31, 25, 0.14);
+  backdrop-filter: blur(14px);
+}
+
+.bottom-nav-item {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(5, 5, 5, 0.58);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.bottom-nav-item-active {
+  background: var(--meadow-2);
+  color: var(--ink);
+}
+
 @media (hover: hover) {
   .icon-button:hover,
   .add-meal-button:hover,
   .ai-estimate-button:not(:disabled):hover,
   .ai-key-row button:hover,
+  .bottom-nav-item:hover,
   .clear-key-button:hover,
   .food-action-button:hover,
+  .formula-button:hover,
+  .summary-edit-button:hover,
   .sheet-close:hover,
   .segment:hover,
   .save-meal-button:not(:disabled):hover {
@@ -1176,6 +1344,10 @@ button {
   }
 
   .onboarding-form > .field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-card .field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
