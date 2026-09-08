@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Home, KeyRound, Pencil, Plus, Settings as SettingsIcon, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Home, KeyRound, Pencil, Plus, Settings as SettingsIcon, Star, Trash2, X } from "lucide-react";
 import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { findFoodDatabaseMatches, FoodDatabaseEntry } from "./data/foodDatabase";
 import {
@@ -119,7 +119,7 @@ type TargetDraft = {
   fat: string;
 };
 
-type AppView = "home" | "settings";
+type AppView = "home" | "foods" | "settings";
 
 type PortionUnit = "serving" | "g";
 
@@ -825,6 +825,10 @@ function BottomNavigation({ activeView, onChange }: { activeView: AppView; onCha
         <Home size={21} strokeWidth={2.5} aria-hidden="true" />
         <span>Home</span>
       </button>
+      <button className={activeView === "foods" ? "bottom-nav-item bottom-nav-item-active" : "bottom-nav-item"} type="button" onClick={() => onChange("foods")}>
+        <Star size={21} strokeWidth={2.5} aria-hidden="true" />
+        <span>Foods</span>
+      </button>
       <button
         className={activeView === "settings" ? "bottom-nav-item bottom-nav-item-active" : "bottom-nav-item"}
         type="button"
@@ -987,10 +991,6 @@ function MyFoodsSection({
   frequent: MyFoodEntry[];
   onRelogFood: (entry: MyFoodEntry) => void;
 }) {
-  if (recent.length === 0 && frequent.length === 0) {
-    return null;
-  }
-
   const renderFoodCard = (entry: MyFoodEntry, label: "recent" | "frequent") => (
     <button className="my-food-card" key={`${label}-${entry.signature}`} type="button" onClick={() => onRelogFood(entry)}>
       <span className="my-food-title">{entry.title}</span>
@@ -1007,9 +1007,12 @@ function MyFoodsSection({
   return (
     <section className="my-foods" aria-label="My Foods">
       <div className="my-foods-header">
-        <p>My Foods</p>
-        <span>Tap to log again</span>
+        <span>Saved foods</span>
+        <h1>My Foods</h1>
+        <p>Tap any card to log it again for the selected day.</p>
       </div>
+
+      {recent.length === 0 && frequent.length === 0 ? <p className="my-foods-empty">Foods you log will appear here automatically.</p> : null}
 
       {recent.length > 0 ? (
         <div className="my-foods-group">
@@ -1651,8 +1654,6 @@ export function App() {
               />
             ) : null}
 
-            <MyFoodsSection recent={myFoods.recent} frequent={myFoods.frequent} onRelogFood={relogFood} />
-
             <div className="meal-list" aria-label="Meals">
               {mealSummaries.map((meal) => (
                 <MealCard
@@ -1667,6 +1668,8 @@ export function App() {
               ))}
             </div>
           </>
+        ) : activeView === "foods" ? (
+          <MyFoodsSection recent={myFoods.recent} frequent={myFoods.frequent} onRelogFood={relogFood} />
         ) : (
           <SettingsScreen
             profile={profile}
