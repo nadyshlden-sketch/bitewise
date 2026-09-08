@@ -203,6 +203,22 @@ function makeId() {
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function makeEmptyLogDraft(mealName: MealName): LogDraft {
+  return {
+    editingId: null,
+    mealName,
+    title: "",
+    calories: "",
+    protein: "",
+    carbs: "",
+    fat: "",
+    aiInput: "",
+    aiResult: null,
+    aiError: "",
+    aiStatus: "idle",
+  };
+}
+
 function getServingDetails(entry: FoodDatabaseEntry) {
   const grams = Number(entry.serving.match(/(\d+(?:\.\d+)?)\s*g/i)?.[1] ?? 0);
   let baseLabel = entry.serving
@@ -736,12 +752,13 @@ function LogSheet({
   draft: LogDraft;
   setDraft: Dispatch<SetStateAction<LogDraft | null>>;
   onClose: () => void;
-  onSave: (event: FormEvent<HTMLFormElement>) => void;
+  onSave: (keepOpen?: boolean) => void;
   apiKey: string;
   onNeedApiKey: () => void;
 }) {
   const [databaseQuery, setDatabaseQuery] = useState("");
   const [selectedDatabaseFood, setSelectedDatabaseFood] = useState<SelectedDatabaseFood | null>(null);
+  const [showManualDetails, setShowManualDetails] = useState(Boolean(draft.editingId));
   const canSave = draft.title.trim().length > 0 && addNumber(draft.calories) > 0;
   const databaseMatches = useMemo(() => findFoodDatabaseMatches(databaseQuery, 8), [databaseQuery]);
 
@@ -783,6 +800,16 @@ function LogSheet({
     const updated = { ...selectedDatabaseFood, ...next };
     setSelectedDatabaseFood(updated);
     applyDatabasePortion(updated.entry, updated.amount, updated.unit);
+  };
+
+  const quickAddDatabaseFood = () => {
+    if (!canSave) {
+      return;
+    }
+
+    onSave(true);
+    setSelectedDatabaseFood(null);
+    setDatabaseQuery("");
   };
 
   const applyAiResultToDraft = (result: ParsedMeal) => {
@@ -851,8 +878,70 @@ function LogSheet({
     }
   };
 
+  const submitLog = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSave(false);
+  };
+
+  const manualFields = (
+    <>
+      <label className="field-label">
+        {draft.editingId ? "Food" : "Food name"}
+        <input
+          autoFocus={Boolean(draft.editingId)}
+          value={draft.title}
+          onChange={(event) => setDraft((current) => (current ? { ...current, title: event.target.value } : current))}
+          placeholder="Food or meal"
+        />
+      </label>
+
+      <div className="field-grid">
+        <label className="field-label">
+          kcal
+          <input
+            inputMode="numeric"
+            value={draft.calories}
+            onChange={(event) => setDraft((current) => (current ? { ...current, calories: event.target.value } : current))}
+            placeholder="0"
+          />
+        </label>
+        <label className="field-label">
+          Protein
+          <input
+            inputMode="numeric"
+            value={draft.protein}
+            onChange={(event) => setDraft((current) => (current ? { ...current, protein: event.target.value } : current))}
+            placeholder="0"
+          />
+        </label>
+        <label className="field-label">
+          Carbs
+          <input
+            inputMode="numeric"
+            value={draft.carbs}
+            onChange={(event) => setDraft((current) => (current ? { ...current, carbs: event.target.value } : current))}
+            placeholder="0"
+          />
+        </label>
+        <label className="field-label">
+          Fat
+          <input
+            inputMode="numeric"
+            value={draft.fat}
+            onChange={(event) => setDraft((current) => (current ? { ...current, fat: event.target.value } : current))}
+            placeholder="0"
+          />
+        </label>
+      </div>
+
+      <button className="save-meal-button" type="submit" disabled={!canSave}>
+        {draft.editingId ? "Save food" : `Add to ${draft.mealName}`}
+      </button>
+    </>
+  );
+
   return (
-      <form className="log-section" aria-label="Log Meal" onSubmit={onSave}>
+      <form className="log-section" aria-label="Log Meal" onSubmit={submitLog}>
         <div className="sheet-header">
           <div>
             <p>{draft.mealName}</p>
@@ -868,6 +957,7 @@ function LogSheet({
             <label className="field-label">
               Search database
               <input
+                autoFocus={!draft.editingId}
                 value={databaseQuery}
                 onChange={(event) => setDatabaseQuery(event.target.value)}
                 placeholder="Egg, banana, rice..."
@@ -898,6 +988,14 @@ function LogSheet({
                       {getServingDetails(selectedDatabaseFood.entry).grams > 0 ? <option value="g">grams</option> : null}
                     </select>
                   </label>
+                </div>
+                <div className="portion-summary">
+                  <span>
+                    {draft.calories || 0} kcal · P {draft.protein || 0}g · C {draft.carbs || 0}g · F {draft.fat || 0}g
+                  </span>
+                  <button className="quick-add-button" type="button" disabled={!canSave} onClick={quickAddDatabaseFood}>
+                    Add
+                  </button>
                 </div>
               </div>
             ) : null}
@@ -990,63 +1088,34 @@ function LogSheet({
                     </li>
                   ))}
                 </ul>
+                <button className="quick-add-button ai-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
+                  Add all
+                </button>
               </div>
             ) : null}
           </section>
         ) : null}
 
-        <label className="field-label">
-          {draft.editingId ? "Food" : "Food name"}
-          <input
-            autoFocus
-            value={draft.title}
-            onChange={(event) => setDraft((current) => (current ? { ...current, title: event.target.value } : current))}
-            placeholder="Food or meal"
-          />
-        </label>
-
-        <div className="field-grid">
-          <label className="field-label">
-            kcal
-            <input
-              inputMode="numeric"
-              value={draft.calories}
-              onChange={(event) => setDraft((current) => (current ? { ...current, calories: event.target.value } : current))}
-              placeholder="0"
-            />
-          </label>
-          <label className="field-label">
-            Protein
-            <input
-              inputMode="numeric"
-              value={draft.protein}
-              onChange={(event) => setDraft((current) => (current ? { ...current, protein: event.target.value } : current))}
-              placeholder="0"
-            />
-          </label>
-          <label className="field-label">
-            Carbs
-            <input
-              inputMode="numeric"
-              value={draft.carbs}
-              onChange={(event) => setDraft((current) => (current ? { ...current, carbs: event.target.value } : current))}
-              placeholder="0"
-            />
-          </label>
-          <label className="field-label">
-            Fat
-            <input
-              inputMode="numeric"
-              value={draft.fat}
-              onChange={(event) => setDraft((current) => (current ? { ...current, fat: event.target.value } : current))}
-              placeholder="0"
-            />
-          </label>
-        </div>
-
-        <button className="save-meal-button" type="submit" disabled={!canSave}>
-          {draft.editingId ? "Save food" : `Add to ${draft.mealName}`}
-        </button>
+        {draft.editingId ? (
+          <div className="manual-details manual-details-open">{manualFields}</div>
+        ) : (
+          <section className="manual-entry" aria-label="Manual food details">
+            <button
+              className="manual-toggle"
+              type="button"
+              aria-expanded={showManualDetails}
+              onClick={() => setShowManualDetails((current) => !current)}
+            >
+              <span>{showManualDetails ? "Hide manual details" : "Manual details"}</span>
+              {showManualDetails ? (
+                <ChevronUp size={18} strokeWidth={2.5} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={18} strokeWidth={2.5} aria-hidden="true" />
+              )}
+            </button>
+            {showManualDetails ? <div className="manual-details">{manualFields}</div> : null}
+          </section>
+        )}
       </form>
   );
 }
@@ -1122,19 +1191,7 @@ export function App() {
 
   const openLogSheet = (mealName: MealName = "Breakfast") => {
     setExpandedMeal(mealName);
-    setDraft({
-      editingId: null,
-      mealName,
-      title: "",
-      calories: "",
-      protein: "",
-      carbs: "",
-      fat: "",
-      aiInput: "",
-      aiResult: null,
-      aiError: "",
-      aiStatus: "idle",
-    });
+    setDraft(makeEmptyLogDraft(mealName));
   };
 
   const openEditSheet = (log: MealLog) => {
@@ -1161,8 +1218,7 @@ export function App() {
     }));
   };
 
-  const saveLog = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const saveLog = (keepOpen = false) => {
     if (!draft) {
       return;
     }
@@ -1229,7 +1285,7 @@ export function App() {
       logs: [...current.logs, ...nextLogs],
     }));
     setExpandedMeal(draft.mealName);
-    setDraft(null);
+    setDraft(keepOpen ? makeEmptyLogDraft(draft.mealName) : null);
   };
 
   return (

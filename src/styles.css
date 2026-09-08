@@ -750,6 +750,39 @@ button {
   margin-bottom: 0;
 }
 
+.portion-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.portion-summary span {
+  min-width: 0;
+  color: rgba(5, 5, 5, 0.7);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.quick-add-button {
+  min-height: 38px;
+  border-radius: 999px;
+  background: var(--meadow-10);
+  color: var(--white);
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.quick-add-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .field-label textarea {
   width: 100%;
   min-height: 92px;
@@ -869,6 +902,11 @@ button {
   white-space: nowrap;
 }
 
+.ai-add-button {
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+}
+
 .ai-item-copy {
   display: grid;
   gap: 3px;
@@ -978,6 +1016,36 @@ button {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 10px;
+}
+
+.manual-entry {
+  display: grid;
+  gap: 10px;
+}
+
+.manual-toggle {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 14px;
+  background: #eef6e7;
+  color: rgba(5, 5, 5, 0.78);
+  padding: 0 13px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.manual-details {
+  display: grid;
+  gap: 0;
+}
+
+.manual-details-open {
+  margin-top: 2px;
 }
 
 .onboarding-form > .field-grid {
