@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Home, KeyRound, Pencil, Plus, Settings as SettingsIcon, Star, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Home, KeyRound, Paperclip, Pencil, Plus, Settings as SettingsIcon, Star, Trash2, X } from "lucide-react";
 import { Dispatch, FormEvent, ReactNode, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { findFoodDatabaseMatches, FoodDatabaseEntry } from "./data/foodDatabase";
 import {
@@ -1586,10 +1586,16 @@ function RecipeBuilder({ apiKey, onNeedApiKey, onSave }: { apiKey: string; onNee
         <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Pancakes" />
       </label>
 
-      <label className="field-label">
-        Add ingredient
-        <input value={ingredientQuery} onChange={(event) => setIngredientQuery(event.target.value)} placeholder="Flour, egg, milk..." />
-      </label>
+      <div className="ingredient-compose-field">
+        <label>
+          Add ingredient
+          <input value={ingredientQuery} onChange={(event) => setIngredientQuery(event.target.value)} placeholder="Flour, egg, milk..." />
+        </label>
+        <label className="attach-food-button" aria-label="Attach ingredient label photo">
+          <Paperclip size={18} strokeWidth={2.5} aria-hidden="true" />
+          <input accept="image/*" type="file" onChange={(event) => scanIngredientLabel(event.target.files?.[0])} />
+        </label>
+      </div>
 
       {ingredientQuery.trim() ? (
         <div className="database-results recipe-ingredient-results" aria-label="Ingredient matches">
@@ -1614,34 +1620,25 @@ function RecipeBuilder({ apiKey, onNeedApiKey, onSave }: { apiKey: string; onNee
         </div>
       ) : null}
 
-      <section className="label-scan-panel" aria-label="Scan ingredient label">
-        <div>
-          <strong>Food label</strong>
-          <span>Use a package label as a recipe ingredient.</span>
-        </div>
-        <label className="photo-input-button">
-          {labelStatus === "loading" ? "Reading label..." : "Take label photo"}
-          <input accept="image/*" capture="environment" type="file" onChange={(event) => scanIngredientLabel(event.target.files?.[0])} />
-        </label>
-        {labelError ? <p className="form-error">{labelError}</p> : null}
-        {labelEstimate ? (
-          <div className="label-estimate-card">
-            <div>
-              <strong>{labelEstimate.name}</strong>
-              <span>
-                per 100g: {labelEstimate.caloriesPer100g} kcal · P {labelEstimate.proteinPer100g}g · C {labelEstimate.carbsPer100g}g · F {labelEstimate.fatPer100g}g
-              </span>
-            </div>
-            <label className="compact-field">
-              Ingredient grams
-              <input inputMode="decimal" value={labelGrams} onChange={(event) => setLabelGrams(event.target.value)} />
-            </label>
-            <button className="quick-add-button" type="button" disabled={scaleLabelPortion(labelEstimate, labelGrams).grams <= 0} onClick={addLabelIngredient}>
-              Add ingredient
-            </button>
+      {labelStatus === "loading" ? <p className="inline-status">Reading label...</p> : null}
+      {labelError ? <p className="form-error">{labelError}</p> : null}
+      {labelEstimate ? (
+        <div className="label-estimate-card">
+          <div>
+            <strong>{labelEstimate.name}</strong>
+            <span>
+              per 100g: {labelEstimate.caloriesPer100g} kcal · P {labelEstimate.proteinPer100g}g · C {labelEstimate.carbsPer100g}g · F {labelEstimate.fatPer100g}g
+            </span>
           </div>
-        ) : null}
-      </section>
+          <label className="compact-field">
+            Ingredient grams
+            <input inputMode="decimal" value={labelGrams} onChange={(event) => setLabelGrams(event.target.value)} />
+          </label>
+          <button className="quick-add-button" type="button" disabled={scaleLabelPortion(labelEstimate, labelGrams).grams <= 0} onClick={addLabelIngredient}>
+            Add ingredient
+          </button>
+        </div>
+      ) : null}
 
       {draft.ingredients.length > 0 ? (
         <div className="recipe-ingredient-list">
@@ -2161,28 +2158,36 @@ function LogSheet({
 
         {!draft.editingId ? (
           <section className="ai-log-panel" aria-label="AI food logging">
-            <label className="field-label">
-              Describe meal
-              <textarea
-                value={draft.aiInput}
-                onChange={(event) =>
-                  setDraft((current) =>
-                    current
-                      ? {
-                          ...current,
-                          aiInput: event.target.value,
-                          aiError: "",
-                        }
-                      : current,
-                  )
-                }
-                placeholder="2 scrambled eggs and toast"
-              />
-            </label>
+            <div className="ai-compose-field">
+              <label>
+                Describe meal
+                <textarea
+                  value={draft.aiInput}
+                  onChange={(event) =>
+                    setDraft((current) =>
+                      current
+                        ? {
+                            ...current,
+                            aiInput: event.target.value,
+                            aiError: "",
+                          }
+                        : current,
+                    )
+                  }
+                  placeholder="2 scrambled eggs and toast"
+                />
+              </label>
+              <label className="attach-food-button" aria-label="Attach food label photo">
+                <Paperclip size={18} strokeWidth={2.5} aria-hidden="true" />
+                <input accept="image/*" type="file" onChange={(event) => scanFoodLabel(event.target.files?.[0])} />
+              </label>
+            </div>
             <button className="ai-estimate-button" type="button" disabled={draft.aiStatus === "loading"} onClick={estimateWithAi}>
               {draft.aiStatus === "loading" ? "Estimating..." : "Estimate with AI"}
             </button>
             {draft.aiError ? <p className="form-error">{draft.aiError}</p> : null}
+            {draft.labelStatus === "loading" ? <p className="inline-status">Reading label...</p> : null}
+            {draft.labelError ? <p className="form-error">{draft.labelError}</p> : null}
             {draft.aiResult ? (
               <div className="ai-result" aria-label="AI estimate result">
                 <div className="ai-result-total">
@@ -2224,34 +2229,23 @@ function LogSheet({
               </div>
             ) : null}
 
-            <section className="label-scan-panel label-scan-panel-inline" aria-label="AI label scanning">
-              <div>
-                <strong>Food label</strong>
-                <span>Scan a nutrition label, then enter your portion in grams.</span>
-              </div>
-              <label className="photo-input-button">
-                {draft.labelStatus === "loading" ? "Reading label..." : "Take label photo"}
-                <input accept="image/*" capture="environment" type="file" onChange={(event) => scanFoodLabel(event.target.files?.[0])} />
-              </label>
-              {draft.labelError ? <p className="form-error">{draft.labelError}</p> : null}
-              {draft.labelEstimate ? (
-                <div className="label-estimate-card">
-                  <div>
-                    <strong>{draft.labelEstimate.name}</strong>
-                    <span>
-                      per 100g: {draft.labelEstimate.caloriesPer100g} kcal · P {draft.labelEstimate.proteinPer100g}g · C {draft.labelEstimate.carbsPer100g}g · F {draft.labelEstimate.fatPer100g}g
-                    </span>
-                  </div>
-                  <label className="compact-field">
-                    Portion, g
-                    <input inputMode="decimal" value={draft.labelGrams} onChange={(event) => updateLabelGrams(event.target.value)} />
-                  </label>
-                  <button className="quick-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
-                    Add to {draft.mealName}
-                  </button>
+            {draft.labelEstimate ? (
+              <div className="label-estimate-card">
+                <div>
+                  <strong>{draft.labelEstimate.name}</strong>
+                  <span>
+                    per 100g: {draft.labelEstimate.caloriesPer100g} kcal · P {draft.labelEstimate.proteinPer100g}g · C {draft.labelEstimate.carbsPer100g}g · F {draft.labelEstimate.fatPer100g}g
+                  </span>
                 </div>
-              ) : null}
-            </section>
+                <label className="compact-field">
+                  Portion, g
+                  <input inputMode="decimal" value={draft.labelGrams} onChange={(event) => updateLabelGrams(event.target.value)} />
+                </label>
+                <button className="quick-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
+                  Add to {draft.mealName}
+                </button>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
