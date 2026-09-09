@@ -620,18 +620,6 @@ button {
   line-height: 1.25;
 }
 
-.my-food-count {
-  min-width: 30px;
-  border-radius: 999px;
-  background: var(--primary-cta);
-  color: var(--primary-cta-text);
-  padding: 4px 8px;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  text-align: center;
-}
-
 .my-food-add-button {
   min-height: 34px;
   flex: 1 1 auto;
@@ -934,6 +922,34 @@ button {
   font-weight: 800;
   line-height: 1.2;
   text-align: right;
+}
+
+.edit-portion-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #eef6e7;
+}
+
+.edit-portion-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.edit-portion-card strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.edit-portion-card span {
+  color: rgba(5, 5, 5, 0.62);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .meal-card {

@@ -46,8 +46,31 @@ type MealLog = {
   protein: number;
   carbs: number;
   fat: number;
+  portion?: PortionReference;
   aiItems?: ParsedMeal["items"];
 };
+
+type PortionReference =
+  | {
+      type: "database";
+      foodName: string;
+      amount: string;
+      unit: PortionUnit;
+    }
+  | {
+      type: "recipe";
+      recipeId: string;
+      grams: string;
+    }
+  | {
+      type: "savedFood";
+      baseTitle: string;
+      baseCalories: number;
+      baseProtein: number;
+      baseCarbs: number;
+      baseFat: number;
+      amount: string;
+    };
 
 type RecipeIngredient = {
   id: string;
@@ -111,6 +134,7 @@ type LogDraft = {
   aiResult: ParsedMeal | null;
   aiError: string;
   aiStatus: "idle" | "loading" | "ready" | "error";
+  portion?: PortionReference;
 };
 
 type OnboardingDraft = {
@@ -175,7 +199,7 @@ type ToastState = {
   message: string;
 };
 
-const CURRENT_STORAGE_VERSION = 6;
+const CURRENT_STORAGE_VERSION = 7;
 const STORAGE_KEY = "bitewise-state-v5";
 
 const mealOrder: Array<Omit<MealSummary, "calories" | "items">> = [
@@ -415,8 +439,55 @@ function scaleMyFoodPortion(entry: MyFoodEntry, amountValue: string) {
   };
 }
 
+function scaleSavedFoodReference(portion: Extract<PortionReference, { type: "savedFood" }>, amountValue = portion.amount) {
+  const amount = addAmount(amountValue);
+
+  return {
+    amount,
+    title: amount === 1 ? portion.baseTitle : `${formatAmount(amount)}x ${portion.baseTitle}`,
+    calories: Math.round(portion.baseCalories * amount),
+    protein: Math.round(portion.baseProtein * amount),
+    carbs: Math.round(portion.baseCarbs * amount),
+    fat: Math.round(portion.baseFat * amount),
+  };
+}
+
 function formatAmount(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+}
+
+function getDatabaseEntryByName(foodName: string) {
+  return findFoodDatabaseMatches(foodName, 1).find((entry) => entry.name.toLowerCase() === foodName.toLowerCase()) ?? findFoodDatabaseMatches(foodName, 1)[0] ?? null;
+}
+
+function getEditablePortion(log: MealLog, recipes: SavedRecipe[]): PortionReference | undefined {
+  if (log.portion) {
+    return log.portion;
+  }
+
+  const gramMatch = log.title.match(/^(\d+(?:\.\d+)?)g\s+(.+)$/i);
+  if (!gramMatch) {
+    return undefined;
+  }
+
+  const entry = getDatabaseEntryByName(gramMatch[2]);
+  if (entry) {
+    return {
+      type: "database",
+      foodName: entry.name,
+      amount: gramMatch[1],
+      unit: "g",
+    };
+  }
+
+  const recipe = recipes.find((candidate) => candidate.name.toLowerCase() === gramMatch[2].toLowerCase());
+  return recipe
+    ? {
+        type: "recipe",
+        recipeId: recipe.id,
+        grams: gramMatch[1],
+      }
+    : undefined;
 }
 
 function foodSignature(log: MealLog) {
@@ -1176,7 +1247,6 @@ function MyFoodsSection({
           P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
         </span>
       </div>
-      <span className="my-food-count">{entry.count}x</span>
     </button>
   );
 
@@ -1482,6 +1552,7 @@ function LogSheet({
   onSave,
   apiKey,
   onNeedApiKey,
+  recipes,
 }: {
   draft: LogDraft;
   setDraft: Dispatch<SetStateAction<LogDraft | null>>;
@@ -1489,6 +1560,7 @@ function LogSheet({
   onSave: (keepOpen?: boolean) => void;
   apiKey: string;
   onNeedApiKey: () => void;
+  recipes: SavedRecipe[];
 }) {
   const [databaseQuery, setDatabaseQuery] = useState("");
   const [selectedDatabaseFood, setSelectedDatabaseFood] = useState<SelectedDatabaseFood | null>(null);
@@ -1507,6 +1579,12 @@ function LogSheet({
             protein: String(scaled.protein),
             carbs: String(scaled.carbs),
             fat: String(scaled.fat),
+            portion: {
+              type: "database",
+              foodName: entry.name,
+              amount,
+              unit,
+            },
             aiResult: null,
             aiError: "",
             aiStatus: "idle",
@@ -1536,6 +1614,47 @@ function LogSheet({
     applyDatabasePortion(updated.entry, updated.amount, updated.unit);
   };
 
+  const updateDraftPortion = (next: Partial<Record<"amount" | "unit" | "grams", string>>) => {
+    if (!draft.portion) {
+      return;
+    }
+
+    const portion = { ...draft.portion, ...next } as PortionReference;
+    let scaled: { title: string; calories: number; protein: number; carbs: number; fat: number } | null = null;
+
+    if (portion.type === "database") {
+      const entry = getDatabaseEntryByName(portion.foodName);
+      scaled = entry ? scaleDatabaseFood(entry, portion.amount, portion.unit) : null;
+    }
+
+    if (portion.type === "recipe") {
+      const recipe = recipes.find((candidate) => candidate.id === portion.recipeId);
+      scaled = recipe ? scaleRecipePortion(recipe, portion.grams) : null;
+    }
+
+    if (portion.type === "savedFood") {
+      scaled = scaleSavedFoodReference(portion);
+    }
+
+    if (!scaled) {
+      return;
+    }
+
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            portion,
+            title: scaled.title,
+            calories: String(scaled.calories),
+            protein: String(scaled.protein),
+            carbs: String(scaled.carbs),
+            fat: String(scaled.fat),
+          }
+        : current,
+    );
+  };
+
   const quickAddDatabaseFood = () => {
     if (!canSave) {
       return;
@@ -1559,6 +1678,7 @@ function LogSheet({
             aiResult: result,
             aiError: "",
             aiStatus: "ready",
+            portion: undefined,
           }
         : current,
     );
@@ -1673,6 +1793,44 @@ function LogSheet({
       </button>
     </>
   );
+
+  const portionEditor = draft.portion ? (
+    <section className="edit-portion-card" aria-label="Edit portion">
+      <div>
+        <strong>{draft.title}</strong>
+        <span>
+          {draft.calories || 0} kcal · P {draft.protein || 0}g · C {draft.carbs || 0}g · F {draft.fat || 0}g
+        </span>
+      </div>
+      {draft.portion.type === "database" ? (
+        <div className="portion-controls">
+          <label className="field-label">
+            Amount
+            <input inputMode="decimal" value={draft.portion.amount} onChange={(event) => updateDraftPortion({ amount: event.target.value })} />
+          </label>
+          <label className="field-label">
+            Unit
+            <select value={draft.portion.unit} onChange={(event) => updateDraftPortion({ unit: event.target.value as PortionUnit })}>
+              <option value="serving">{getServingDetails(getDatabaseEntryByName(draft.portion.foodName) ?? { name: draft.portion.foodName, aliases: [], serving: "1 serving", calories: 0, protein: 0, carbs: 0, fat: 0, category: "" }).baseLabel}</option>
+              <option value="g">grams</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
+      {draft.portion.type === "recipe" ? (
+        <label className="field-label">
+          Portion, g
+          <input inputMode="decimal" value={draft.portion.grams} onChange={(event) => updateDraftPortion({ grams: event.target.value })} />
+        </label>
+      ) : null}
+      {draft.portion.type === "savedFood" ? (
+        <label className="field-label">
+          Portions
+          <input inputMode="decimal" value={draft.portion.amount} onChange={(event) => updateDraftPortion({ amount: event.target.value })} />
+        </label>
+      ) : null}
+    </section>
+  ) : null;
 
   return (
       <form className="log-section" aria-label="Log Meal" onSubmit={submitLog}>
@@ -1831,7 +1989,10 @@ function LogSheet({
         ) : null}
 
         {draft.editingId ? (
-          <div className="manual-details manual-details-open">{manualFields}</div>
+          <>
+            {portionEditor}
+            <div className="manual-details manual-details-open">{manualFields}</div>
+          </>
         ) : (
           <section className="manual-entry" aria-label="Manual food details">
             <button
@@ -1949,6 +2110,7 @@ export function App() {
   };
 
   const openEditSheet = (log: MealLog) => {
+    const portion = getEditablePortion(log, recipes);
     setActiveView("home");
     setDraft({
       editingId: log.id,
@@ -1962,6 +2124,7 @@ export function App() {
       aiResult: null,
       aiError: "",
       aiStatus: "idle",
+      portion,
     });
   };
 
@@ -2001,6 +2164,15 @@ export function App() {
       protein: scaled.protein,
       carbs: scaled.carbs,
       fat: scaled.fat,
+      portion: {
+        type: "savedFood",
+        baseTitle: entry.title,
+        baseCalories: entry.calories,
+        baseProtein: entry.protein,
+        baseCarbs: entry.carbs,
+        baseFat: entry.fat,
+        amount: amountValue,
+      },
     };
 
     setStoredState((current) => ({
@@ -2048,6 +2220,11 @@ export function App() {
       protein: scaled.protein,
       carbs: scaled.carbs,
       fat: scaled.fat,
+      portion: {
+        type: "recipe",
+        recipeId: recipe.id,
+        grams: gramsValue,
+      },
     };
 
     setStoredState((current) => ({
@@ -2083,6 +2260,7 @@ export function App() {
                 protein: addNumber(draft.protein),
                 carbs: addNumber(draft.carbs),
                 fat: addNumber(draft.fat),
+                portion: draft.portion,
               }
             : log,
         ),
@@ -2118,6 +2296,7 @@ export function App() {
             protein: addNumber(draft.protein),
             carbs: addNumber(draft.carbs),
             fat: addNumber(draft.fat),
+            portion: draft.portion,
           },
         ];
 
@@ -2177,6 +2356,7 @@ export function App() {
                   onSave={saveLog}
                   apiKey={geminiApiKey}
                   onNeedApiKey={() => setActiveView("settings")}
+                  recipes={recipes}
                 />
               ) : null}
 
