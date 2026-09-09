@@ -160,6 +160,16 @@ type RecipeDraft = {
   ingredients: RecipeIngredient[];
 };
 
+type MyFoodLogTarget =
+  | {
+      type: "food";
+      entry: MyFoodEntry;
+    }
+  | {
+      type: "recipe";
+      recipe: SavedRecipe;
+    };
+
 type ToastState = {
   id: number;
   message: string;
@@ -198,6 +208,11 @@ const fallbackState: StoredState = {
 const addNumber = (value: string) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 0;
+};
+
+const addAmount = (value: string) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 };
 
 const fallbackMacroGoals: Record<MacroLabel, number> = {
@@ -374,17 +389,34 @@ function calculateRecipeNutrition(draft: RecipeDraft) {
 }
 
 function scaleRecipePortion(recipe: SavedRecipe, gramsValue: string) {
-  const grams = addNumber(gramsValue);
+  const grams = addAmount(gramsValue);
   const ratio = grams / 100;
 
   return {
     grams,
-    title: `${grams}g ${recipe.name}`,
+    title: `${formatAmount(grams)}g ${recipe.name}`,
     calories: Math.round(recipe.caloriesPer100g * ratio),
     protein: Math.round(recipe.proteinPer100g * ratio),
     carbs: Math.round(recipe.carbsPer100g * ratio),
     fat: Math.round(recipe.fatPer100g * ratio),
   };
+}
+
+function scaleMyFoodPortion(entry: MyFoodEntry, amountValue: string) {
+  const amount = addAmount(amountValue);
+
+  return {
+    amount,
+    title: amount === 1 ? entry.title : `${formatAmount(amount)}x ${entry.title}`,
+    calories: Math.round(entry.calories * amount),
+    protein: Math.round(entry.protein * amount),
+    carbs: Math.round(entry.carbs * amount),
+    fat: Math.round(entry.fat * amount),
+  };
+}
+
+function formatAmount(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
 }
 
 function foodSignature(log: MealLog) {
@@ -1116,7 +1148,6 @@ function MealCard({
 }
 
 function MyFoodsSection({
-  recent,
   frequent,
   recipes,
   onRelogFood,
@@ -1124,20 +1155,18 @@ function MyFoodsSection({
   onLogRecipe,
   onDeleteRecipe,
 }: {
-  recent: MyFoodEntry[];
   frequent: MyFoodEntry[];
   recipes: SavedRecipe[];
-  onRelogFood: (entry: MyFoodEntry, mealName: MealName) => void;
+  onRelogFood: (entry: MyFoodEntry, mealName: MealName, amount: string) => void;
   onSaveRecipe: (recipe: SavedRecipe) => void;
   onLogRecipe: (recipe: SavedRecipe, mealName: MealName, grams: string) => void;
   onDeleteRecipe: (id: string) => void;
 }) {
-  const [selectedMeal, setSelectedMeal] = useState<MealName>("Breakfast");
   const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
-  const [recipePortions, setRecipePortions] = useState<Record<string, string>>({});
+  const [logTarget, setLogTarget] = useState<MyFoodLogTarget | null>(null);
 
-  const renderFoodCard = (entry: MyFoodEntry, label: "recent" | "frequent") => (
-    <article className="my-food-card" key={`${label}-${entry.signature}`}>
+  const renderFoodCard = (entry: MyFoodEntry) => (
+    <button className="my-food-card" key={entry.signature} type="button" onClick={() => setLogTarget({ type: "food", entry })}>
       <div className="my-food-card-copy">
         <span className="my-food-title">{entry.title}</span>
         <span className="my-food-meta">
@@ -1147,13 +1176,8 @@ function MyFoodsSection({
           P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
         </span>
       </div>
-      <div className="my-food-card-actions">
-        {label === "frequent" ? <span className="my-food-count">{entry.count}x</span> : null}
-        <button className="my-food-add-button" type="button" onClick={() => onRelogFood(entry, selectedMeal)}>
-          Add
-        </button>
-      </div>
-    </article>
+      <span className="my-food-count">{entry.count}x</span>
+    </button>
   );
 
   return (
@@ -1161,28 +1185,10 @@ function MyFoodsSection({
       <div className="my-foods-header">
         <span>Saved foods</span>
         <h1>My Foods</h1>
-        <p>Pick today's meal, then add foods from your history.</p>
+        <p>Tap a food or recipe to choose portion and meal.</p>
       </div>
 
-      {recent.length === 0 && frequent.length === 0 && recipes.length === 0 ? <p className="my-foods-empty">Foods you log will appear here automatically.</p> : null}
-
-      {recent.length > 0 || frequent.length > 0 || recipes.length > 0 ? (
-        <section className="my-foods-meal-picker" aria-label="Choose meal for saved foods">
-          <p>Log to</p>
-          <div>
-            {mealOrder.map((meal) => (
-              <button
-                className={selectedMeal === meal.name ? "meal-pill meal-pill-active" : "meal-pill"}
-                key={meal.name}
-                type="button"
-                onClick={() => setSelectedMeal(meal.name)}
-              >
-                {meal.name}
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {frequent.length === 0 && recipes.length === 0 ? <p className="my-foods-empty">Foods you log often will appear here automatically.</p> : null}
 
       <section className="recipes-panel" aria-label="Saved recipes">
         <div className="recipes-panel-header">
@@ -1202,63 +1208,132 @@ function MyFoodsSection({
 
         {recipes.length > 0 ? (
           <div className="recipe-list">
-            {recipes.map((recipe) => {
-              const portion = recipePortions[recipe.id] ?? "100";
-              const scaled = scaleRecipePortion(recipe, portion);
-
-              return (
-                <article className="recipe-card" key={recipe.id}>
-                  <div className="recipe-card-copy">
+            {recipes.map((recipe) => (
+              <article className="recipe-card" key={recipe.id}>
+                <button className="recipe-card-main" type="button" onClick={() => setLogTarget({ type: "recipe", recipe })}>
+                  <span>
                     <strong>{recipe.name}</strong>
-                    <span>
-                      per 100g: {recipe.caloriesPer100g} kcal · P {recipe.proteinPer100g}g · C {recipe.carbsPer100g}g · F {recipe.fatPer100g}g
-                    </span>
                     <small>{recipe.ingredients.length} ingredients · {recipe.cookedWeightGrams}g cooked</small>
-                  </div>
-                  <div className="recipe-log-controls">
-                    <label className="compact-field">
-                      Portion, g
-                      <input
-                        inputMode="numeric"
-                        value={portion}
-                        onChange={(event) => setRecipePortions((current) => ({ ...current, [recipe.id]: event.target.value }))}
-                      />
-                    </label>
-                    <div className="recipe-log-summary">
-                      <span>
-                        {scaled.calories} kcal · P {scaled.protein}g · C {scaled.carbs}g · F {scaled.fat}g
-                      </span>
-                      <button className="my-food-add-button" type="button" disabled={scaled.grams <= 0} onClick={() => onLogRecipe(recipe, selectedMeal, portion)}>
-                        Add
-                      </button>
-                      <button className="food-action-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => onDeleteRecipe(recipe.id)}>
-                        <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
+                  </span>
+                  <span>
+                    <strong>{recipe.caloriesPer100g} kcal</strong>
+                    <small>
+                      P {recipe.proteinPer100g}g · C {recipe.carbsPer100g}g · F {recipe.fatPer100g}g
+                    </small>
+                  </span>
+                </button>
+                <button className="food-action-button recipe-delete-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => onDeleteRecipe(recipe.id)}>
+                  <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
+                </button>
+              </article>
+            ))}
           </div>
         ) : (
           <p className="my-foods-empty">No saved recipes yet.</p>
         )}
       </section>
 
-      {recent.length > 0 ? (
+      {frequent.length > 0 ? (
         <div className="my-foods-group">
-          <h2>Recent</h2>
-          <div className="my-foods-row">{recent.map((entry) => renderFoodCard(entry, "recent"))}</div>
+          <h2>Frequently added</h2>
+          <div className="my-foods-row">{frequent.map((entry) => renderFoodCard(entry))}</div>
         </div>
       ) : null}
 
-      {frequent.length > 0 ? (
-        <div className="my-foods-group">
-          <h2>Frequent</h2>
-          <div className="my-foods-row">{frequent.map((entry) => renderFoodCard(entry, "frequent"))}</div>
-        </div>
+      {logTarget ? (
+        <MyFoodLogDialog
+          target={logTarget}
+          onClose={() => setLogTarget(null)}
+          onLogFood={(entry, mealName, amount) => {
+            onRelogFood(entry, mealName, amount);
+            setLogTarget(null);
+          }}
+          onLogRecipe={(recipe, mealName, grams) => {
+            onLogRecipe(recipe, mealName, grams);
+            setLogTarget(null);
+          }}
+        />
       ) : null}
     </section>
+  );
+}
+
+function MyFoodLogDialog({
+  target,
+  onClose,
+  onLogFood,
+  onLogRecipe,
+}: {
+  target: MyFoodLogTarget;
+  onClose: () => void;
+  onLogFood: (entry: MyFoodEntry, mealName: MealName, amount: string) => void;
+  onLogRecipe: (recipe: SavedRecipe, mealName: MealName, grams: string) => void;
+}) {
+  const [mealName, setMealName] = useState<MealName>("Breakfast");
+  const [amount, setAmount] = useState(target.type === "recipe" ? "100" : "1");
+  const scaled = target.type === "recipe" ? scaleRecipePortion(target.recipe, amount) : scaleMyFoodPortion(target.entry, amount);
+  const canLog = target.type === "recipe" ? scaled.calories > 0 && "grams" in scaled && scaled.grams > 0 : scaled.calories > 0 && "amount" in scaled && scaled.amount > 0;
+  const title = target.type === "recipe" ? target.recipe.name : target.entry.title;
+  const subtitle =
+    target.type === "recipe"
+      ? `${target.recipe.caloriesPer100g} kcal per 100g`
+      : `${target.entry.calories} kcal per saved portion`;
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canLog) {
+      return;
+    }
+
+    if (target.type === "recipe") {
+      onLogRecipe(target.recipe, mealName, amount);
+    } else {
+      onLogFood(target.entry, mealName, amount);
+    }
+  };
+
+  return (
+    <div className="my-food-dialog-backdrop">
+      <form className="my-food-dialog" aria-label="Log saved food" onSubmit={submit}>
+        <div className="sheet-header">
+          <div>
+            <p>{target.type === "recipe" ? "Recipe" : "Saved food"}</p>
+            <h2>{title}</h2>
+            <span className="dialog-subtitle">{subtitle}</span>
+          </div>
+          <button className="sheet-close" type="button" aria-label="Close" onClick={onClose}>
+            <X size={22} strokeWidth={2.5} aria-hidden="true" />
+          </button>
+        </div>
+
+        <fieldset className="dialog-meal-picker">
+          <legend>Meal</legend>
+          <div>
+            {mealOrder.map((meal) => (
+              <button className={mealName === meal.name ? "meal-pill meal-pill-active" : "meal-pill"} key={meal.name} type="button" onClick={() => setMealName(meal.name)}>
+                {meal.name}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="field-label">
+          {target.type === "recipe" ? "Portion, g" : "Portions"}
+          <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />
+        </label>
+
+        <div className="dialog-total">
+          <strong>{scaled.calories} kcal</strong>
+          <span>
+            P {scaled.protein}g · C {scaled.carbs}g · F {scaled.fat}g
+          </span>
+        </div>
+
+        <button className="save-meal-button" type="submit" disabled={!canLog}>
+          Add to {mealName}
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -1908,18 +1983,24 @@ export function App() {
     showToast("Food deleted");
   };
 
-  const relogFood = (entry: MyFoodEntry, mealName: MealName) => {
+  const relogFood = (entry: MyFoodEntry, mealName: MealName, amountValue: string) => {
+    const scaled = scaleMyFoodPortion(entry, amountValue);
+
+    if (scaled.amount <= 0 || scaled.calories <= 0) {
+      return;
+    }
+
     const nextLog: MealLog = {
       id: makeId(),
       kind: "meal",
       dateKey: selectedDateKey,
       loggedAt: new Date().toISOString(),
       mealName,
-      title: entry.title,
-      calories: entry.calories,
-      protein: entry.protein,
-      carbs: entry.carbs,
-      fat: entry.fat,
+      title: scaled.title,
+      calories: scaled.calories,
+      protein: scaled.protein,
+      carbs: scaled.carbs,
+      fat: scaled.fat,
     };
 
     setStoredState((current) => ({
@@ -2115,7 +2196,6 @@ export function App() {
             </>
           ) : activeView === "foods" ? (
             <MyFoodsSection
-              recent={myFoods.recent}
               frequent={myFoods.frequent}
               recipes={recipes}
               onRelogFood={relogFood}
