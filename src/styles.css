@@ -1012,23 +1012,16 @@ button {
   letter-spacing: 0;
 }
 
-.meal-calories {
+.meal-details {
   display: block;
   margin-top: 4px;
   color: rgba(5, 5, 5, 0.66);
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
-}
-
-.meal-macros {
-  display: block;
-  margin-top: 5px;
-  color: rgba(5, 5, 5, 0.54);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.15;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .meal-dropdown {

@@ -1178,9 +1178,8 @@ function MealCard({
               <ChevronDown size={16} strokeWidth={2.5} aria-hidden="true" />
             )}
           </span>
-          <span className="meal-calories">{meal.calories > 0 ? `${meal.calories} kcal` : "0 kcal"}</span>
-          <span className="meal-macros">
-            P {meal.protein}g · C {meal.carbs}g · F {meal.fat}g
+          <span className="meal-details">
+            {meal.calories > 0 ? `${meal.calories} kcal` : "0 kcal"} · P {meal.protein}g · C {meal.carbs}g · F {meal.fat}g
           </span>
         </span>
       </button>
