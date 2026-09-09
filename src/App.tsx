@@ -106,6 +106,9 @@ type StoredState = {
 type MealSummary = {
   name: MealName;
   calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
   items: MealLog[];
   tone: "spring" | "meadow" | "lagoon" | "ocean";
 };
@@ -202,7 +205,7 @@ type ToastState = {
 const CURRENT_STORAGE_VERSION = 7;
 const STORAGE_KEY = "bitewise-state-v5";
 
-const mealOrder: Array<Omit<MealSummary, "calories" | "items">> = [
+const mealOrder: Array<Pick<MealSummary, "name" | "tone">> = [
   { name: "Breakfast", tone: "spring" },
   { name: "Lunch", tone: "meadow" },
   { name: "Snack", tone: "lagoon" },
@@ -1176,6 +1179,9 @@ function MealCard({
             )}
           </span>
           <span className="meal-calories">{meal.calories > 0 ? `${meal.calories} kcal` : "0 kcal"}</span>
+          <span className="meal-macros">
+            P {meal.protein}g · C {meal.carbs}g · F {meal.fat}g
+          </span>
         </span>
       </button>
 
@@ -2062,6 +2068,9 @@ export function App() {
         return {
           ...meal,
           calories: entries.reduce((total, log) => total + log.calories, 0),
+          protein: entries.reduce((total, log) => total + log.protein, 0),
+          carbs: entries.reduce((total, log) => total + log.carbs, 0),
+          fat: entries.reduce((total, log) => total + log.fat, 0),
           items: entries,
         };
       }),
