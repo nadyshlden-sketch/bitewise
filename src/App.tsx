@@ -4,6 +4,8 @@ import { findFoodDatabaseMatches, FoodDatabaseEntry } from "./data/foodDatabase"
 import {
   clearGeminiApiKey,
   getStoredGeminiApiKey,
+  estimateFoodLabelWithGemini,
+  LabelNutritionEstimate,
   maskGeminiApiKey,
   ParsedMeal,
   parseMealWithGemini,
@@ -70,6 +72,15 @@ type PortionReference =
       baseCarbs: number;
       baseFat: number;
       amount: string;
+    }
+  | {
+      type: "label";
+      name: string;
+      grams: string;
+      caloriesPer100g: number;
+      proteinPer100g: number;
+      carbsPer100g: number;
+      fatPer100g: number;
     };
 
 type RecipeIngredient = {
@@ -82,6 +93,7 @@ type RecipeIngredient = {
   protein: number;
   carbs: number;
   fat: number;
+  labelEstimate?: LabelNutritionEstimate;
 };
 
 type SavedRecipe = {
@@ -137,6 +149,10 @@ type LogDraft = {
   aiResult: ParsedMeal | null;
   aiError: string;
   aiStatus: "idle" | "loading" | "ready" | "error";
+  labelEstimate: LabelNutritionEstimate | null;
+  labelGrams: string;
+  labelError: string;
+  labelStatus: "idle" | "loading" | "ready" | "error";
   portion?: PortionReference;
 };
 
@@ -318,6 +334,10 @@ function makeEmptyLogDraft(mealName: MealName): LogDraft {
     aiResult: null,
     aiError: "",
     aiStatus: "idle",
+    labelEstimate: null,
+    labelGrams: "100",
+    labelError: "",
+    labelStatus: "idle",
   };
 }
 
@@ -386,6 +406,18 @@ function updateRecipeIngredientNutrition(ingredient: RecipeIngredient, entry: Fo
   };
 }
 
+function updateLabelIngredientNutrition(ingredient: RecipeIngredient, estimate: LabelNutritionEstimate) {
+  const scaled = scaleLabelPortion(estimate, ingredient.amount);
+
+  return {
+    ...ingredient,
+    calories: scaled.calories,
+    protein: scaled.protein,
+    carbs: scaled.carbs,
+    fat: scaled.fat,
+  };
+}
+
 function getRecipeTotals(ingredients: RecipeIngredient[]) {
   return ingredients.reduce(
     (totals, ingredient) => ({
@@ -439,6 +471,20 @@ function scaleMyFoodPortion(entry: MyFoodEntry, amountValue: string) {
     protein: Math.round(entry.protein * amount),
     carbs: Math.round(entry.carbs * amount),
     fat: Math.round(entry.fat * amount),
+  };
+}
+
+function scaleLabelPortion(estimate: LabelNutritionEstimate, gramsValue: string) {
+  const grams = addAmount(gramsValue);
+  const ratio = grams / 100;
+
+  return {
+    grams,
+    title: `${formatAmount(grams)}g ${estimate.name}`,
+    calories: Math.round(estimate.caloriesPer100g * ratio),
+    protein: Math.round(estimate.proteinPer100g * ratio),
+    carbs: Math.round(estimate.carbsPer100g * ratio),
+    fat: Math.round(estimate.fatPer100g * ratio),
   };
 }
 
@@ -1226,6 +1272,8 @@ function MealCard({
 function MyFoodsSection({
   frequent,
   recipes,
+  apiKey,
+  onNeedApiKey,
   onRelogFood,
   onSaveRecipe,
   onLogRecipe,
@@ -1233,6 +1281,8 @@ function MyFoodsSection({
 }: {
   frequent: MyFoodEntry[];
   recipes: SavedRecipe[];
+  apiKey: string;
+  onNeedApiKey: () => void;
   onRelogFood: (entry: MyFoodEntry, mealName: MealName, amount: string) => void;
   onSaveRecipe: (recipe: SavedRecipe) => void;
   onLogRecipe: (recipe: SavedRecipe, mealName: MealName, grams: string) => void;
@@ -1276,7 +1326,7 @@ function MyFoodsSection({
           </button>
         </div>
 
-        {isRecipeBuilderOpen ? <RecipeBuilder onSave={(recipe) => {
+        {isRecipeBuilderOpen ? <RecipeBuilder apiKey={apiKey} onNeedApiKey={onNeedApiKey} onSave={(recipe) => {
           onSaveRecipe(recipe);
           setIsRecipeBuilderOpen(false);
         }} /> : null}
@@ -1412,9 +1462,13 @@ function MyFoodLogDialog({
   );
 }
 
-function RecipeBuilder({ onSave }: { onSave: (recipe: SavedRecipe) => void }) {
+function RecipeBuilder({ apiKey, onNeedApiKey, onSave }: { apiKey: string; onNeedApiKey: () => void; onSave: (recipe: SavedRecipe) => void }) {
   const [draft, setDraft] = useState<RecipeDraft>({ name: "", cookedWeightGrams: "", ingredients: [] });
   const [ingredientQuery, setIngredientQuery] = useState("");
+  const [labelEstimate, setLabelEstimate] = useState<LabelNutritionEstimate | null>(null);
+  const [labelGrams, setLabelGrams] = useState("100");
+  const [labelStatus, setLabelStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [labelError, setLabelError] = useState("");
   const ingredientMatches = useMemo(() => findFoodDatabaseMatches(ingredientQuery, 6), [ingredientQuery]);
   const nutrition = useMemo(() => calculateRecipeNutrition(draft), [draft]);
   const canSave = draft.name.trim().length > 0 && nutrition.cookedWeight > 0 && draft.ingredients.length > 0;
@@ -1424,12 +1478,76 @@ function RecipeBuilder({ onSave }: { onSave: (recipe: SavedRecipe) => void }) {
     setIngredientQuery("");
   };
 
+  const scanIngredientLabel = async (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+
+    if (!apiKey) {
+      setLabelError("Add your Gemini API key before scanning labels.");
+      setLabelStatus("error");
+      onNeedApiKey();
+      return;
+    }
+
+    setLabelError("");
+    setLabelStatus("loading");
+
+    try {
+      const estimate = await estimateFoodLabelWithGemini(file, apiKey);
+      setLabelEstimate(estimate);
+      setLabelGrams("100");
+      setLabelStatus("ready");
+    } catch (error) {
+      setLabelEstimate(null);
+      setLabelError(error instanceof Error ? error.message : "Gemini could not read this label.");
+      setLabelStatus("error");
+    }
+  };
+
+  const addLabelIngredient = () => {
+    if (!labelEstimate) {
+      return;
+    }
+
+    const scaled = scaleLabelPortion(labelEstimate, labelGrams);
+    if (scaled.grams <= 0 || scaled.calories <= 0) {
+      return;
+    }
+
+    setDraft((current) => ({
+      ...current,
+      ingredients: [
+        ...current.ingredients,
+        {
+          id: makeId(),
+          foodName: labelEstimate.name,
+          serving: "100g from label",
+          amount: labelGrams,
+          unit: "g",
+          calories: scaled.calories,
+          protein: scaled.protein,
+          carbs: scaled.carbs,
+          fat: scaled.fat,
+          labelEstimate,
+        },
+      ],
+    }));
+    setLabelEstimate(null);
+    setLabelGrams("100");
+    setLabelStatus("idle");
+  };
+
   const updateIngredient = (ingredientId: string, next: Partial<Pick<RecipeIngredient, "amount" | "unit">>) => {
     setDraft((current) => ({
       ...current,
       ingredients: current.ingredients.map((ingredient) => {
         if (ingredient.id !== ingredientId) {
           return ingredient;
+        }
+
+        if (ingredient.labelEstimate) {
+          return updateLabelIngredientNutrition({ ...ingredient, ...next, unit: "g" }, ingredient.labelEstimate);
         }
 
         const databaseEntry = findFoodDatabaseMatches(ingredient.foodName, 1)[0];
@@ -1496,10 +1614,39 @@ function RecipeBuilder({ onSave }: { onSave: (recipe: SavedRecipe) => void }) {
         </div>
       ) : null}
 
+      <section className="label-scan-panel" aria-label="Scan ingredient label">
+        <div>
+          <strong>Food label</strong>
+          <span>Use a package label as a recipe ingredient.</span>
+        </div>
+        <label className="photo-input-button">
+          {labelStatus === "loading" ? "Reading label..." : "Take label photo"}
+          <input accept="image/*" capture="environment" type="file" onChange={(event) => scanIngredientLabel(event.target.files?.[0])} />
+        </label>
+        {labelError ? <p className="form-error">{labelError}</p> : null}
+        {labelEstimate ? (
+          <div className="label-estimate-card">
+            <div>
+              <strong>{labelEstimate.name}</strong>
+              <span>
+                per 100g: {labelEstimate.caloriesPer100g} kcal · P {labelEstimate.proteinPer100g}g · C {labelEstimate.carbsPer100g}g · F {labelEstimate.fatPer100g}g
+              </span>
+            </div>
+            <label className="compact-field">
+              Ingredient grams
+              <input inputMode="decimal" value={labelGrams} onChange={(event) => setLabelGrams(event.target.value)} />
+            </label>
+            <button className="quick-add-button" type="button" disabled={scaleLabelPortion(labelEstimate, labelGrams).grams <= 0} onClick={addLabelIngredient}>
+              Add ingredient
+            </button>
+          </div>
+        ) : null}
+      </section>
+
       {draft.ingredients.length > 0 ? (
         <div className="recipe-ingredient-list">
           {draft.ingredients.map((ingredient) => {
-            const databaseEntry = findFoodDatabaseMatches(ingredient.foodName, 1)[0];
+            const databaseEntry = ingredient.labelEstimate ? null : findFoodDatabaseMatches(ingredient.foodName, 1)[0];
             const details = databaseEntry ? getServingDetails(databaseEntry) : null;
 
             return (
@@ -1512,9 +1659,9 @@ function RecipeBuilder({ onSave }: { onSave: (recipe: SavedRecipe) => void }) {
                 </div>
                 <div className="recipe-ingredient-controls">
                   <input inputMode="decimal" value={ingredient.amount} onChange={(event) => updateIngredient(ingredient.id, { amount: event.target.value })} />
-                  <select value={ingredient.unit} onChange={(event) => updateIngredient(ingredient.id, { unit: event.target.value as PortionUnit })}>
+                  <select value={ingredient.unit} disabled={Boolean(ingredient.labelEstimate)} onChange={(event) => updateIngredient(ingredient.id, { unit: event.target.value as PortionUnit })}>
                     <option value="serving">{details?.baseLabel ?? "serving"}</option>
-                    {details?.grams ? <option value="g">grams</option> : null}
+                    {details?.grams || ingredient.labelEstimate ? <option value="g">grams</option> : null}
                   </select>
                   <button className="food-action-button" type="button" aria-label={`Remove ${ingredient.foodName}`} onClick={() => removeIngredient(ingredient.id)}>
                     <X size={14} strokeWidth={2.4} aria-hidden="true" />
@@ -1593,6 +1740,9 @@ function LogSheet({
             aiResult: null,
             aiError: "",
             aiStatus: "idle",
+            labelEstimate: null,
+            labelError: "",
+            labelStatus: "idle",
           }
         : current,
     );
@@ -1639,6 +1789,10 @@ function LogSheet({
 
     if (portion.type === "savedFood") {
       scaled = scaleSavedFoodReference(portion);
+    }
+
+    if (portion.type === "label") {
+      scaled = scaleLabelPortion(portion, portion.grams);
     }
 
     if (!scaled) {
@@ -1735,6 +1889,85 @@ function LogSheet({
           : current,
       );
     }
+  };
+
+  const applyLabelEstimateToDraft = (estimate: LabelNutritionEstimate, gramsValue: string) => {
+    const scaled = scaleLabelPortion(estimate, gramsValue);
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            title: scaled.title,
+            calories: String(scaled.calories),
+            protein: String(scaled.protein),
+            carbs: String(scaled.carbs),
+            fat: String(scaled.fat),
+            labelEstimate: estimate,
+            labelGrams: gramsValue,
+            labelError: "",
+            labelStatus: "ready",
+            aiResult: null,
+            aiError: "",
+            aiStatus: "idle",
+            portion: {
+              type: "label",
+              name: estimate.name,
+              grams: gramsValue,
+              caloriesPer100g: estimate.caloriesPer100g,
+              proteinPer100g: estimate.proteinPer100g,
+              carbsPer100g: estimate.carbsPer100g,
+              fatPer100g: estimate.fatPer100g,
+            },
+          }
+        : current,
+    );
+  };
+
+  const scanFoodLabel = async (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+
+    if (!apiKey) {
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              labelError: "Add your Gemini API key before scanning labels.",
+              labelStatus: "error",
+            }
+          : current,
+      );
+      onNeedApiKey();
+      return;
+    }
+
+    setDraft((current) => (current ? { ...current, labelError: "", labelStatus: "loading" } : current));
+
+    try {
+      const estimate = await estimateFoodLabelWithGemini(file, apiKey);
+      applyLabelEstimateToDraft(estimate, draft.labelGrams || "100");
+    } catch (error) {
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              labelEstimate: null,
+              labelError: error instanceof Error ? error.message : "Gemini could not read this label.",
+              labelStatus: "error",
+            }
+          : current,
+      );
+    }
+  };
+
+  const updateLabelGrams = (gramsValue: string) => {
+    if (!draft.labelEstimate) {
+      setDraft((current) => (current ? { ...current, labelGrams: gramsValue } : current));
+      return;
+    }
+
+    applyLabelEstimateToDraft(draft.labelEstimate, gramsValue);
   };
 
   const submitLog = (event: FormEvent<HTMLFormElement>) => {
@@ -1990,6 +2223,35 @@ function LogSheet({
                 </button>
               </div>
             ) : null}
+
+            <section className="label-scan-panel label-scan-panel-inline" aria-label="AI label scanning">
+              <div>
+                <strong>Food label</strong>
+                <span>Scan a nutrition label, then enter your portion in grams.</span>
+              </div>
+              <label className="photo-input-button">
+                {draft.labelStatus === "loading" ? "Reading label..." : "Take label photo"}
+                <input accept="image/*" capture="environment" type="file" onChange={(event) => scanFoodLabel(event.target.files?.[0])} />
+              </label>
+              {draft.labelError ? <p className="form-error">{draft.labelError}</p> : null}
+              {draft.labelEstimate ? (
+                <div className="label-estimate-card">
+                  <div>
+                    <strong>{draft.labelEstimate.name}</strong>
+                    <span>
+                      per 100g: {draft.labelEstimate.caloriesPer100g} kcal · P {draft.labelEstimate.proteinPer100g}g · C {draft.labelEstimate.carbsPer100g}g · F {draft.labelEstimate.fatPer100g}g
+                    </span>
+                  </div>
+                  <label className="compact-field">
+                    Portion, g
+                    <input inputMode="decimal" value={draft.labelGrams} onChange={(event) => updateLabelGrams(event.target.value)} />
+                  </label>
+                  <button className="quick-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
+                    Add to {draft.mealName}
+                  </button>
+                </div>
+              ) : null}
+            </section>
           </section>
         ) : null}
 
@@ -2132,6 +2394,10 @@ export function App() {
       aiResult: null,
       aiError: "",
       aiStatus: "idle",
+      labelEstimate: portion?.type === "label" ? portion : null,
+      labelGrams: portion?.type === "label" ? portion.grams : "100",
+      labelError: "",
+      labelStatus: portion?.type === "label" ? "ready" : "idle",
       portion,
     });
   };
@@ -2386,6 +2652,8 @@ export function App() {
             <MyFoodsSection
               frequent={myFoods.frequent}
               recipes={recipes}
+              apiKey={geminiApiKey}
+              onNeedApiKey={() => setActiveView("settings")}
               onRelogFood={relogFood}
               onSaveRecipe={saveRecipe}
               onLogRecipe={logRecipe}

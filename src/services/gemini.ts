@@ -20,6 +20,14 @@ export type ParsedMeal = {
   totalFat: number;
 };
 
+export type LabelNutritionEstimate = {
+  name: string;
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatPer100g: number;
+};
+
 type GeminiGenerateContentResponse = {
   candidates?: Array<{
     content?: {
@@ -95,6 +103,28 @@ function normalizeParsedMeal(value: Partial<ParsedMeal>, fallbackTitle: string):
     totalCarbs: cleanNumber(value.totalCarbs) || itemCarbs,
     totalFat: cleanNumber(value.totalFat) || itemFat,
   };
+}
+
+function normalizeLabelEstimate(value: Partial<LabelNutritionEstimate>): LabelNutritionEstimate {
+  return {
+    name: String(value.name ?? "Food label").trim() || "Food label",
+    caloriesPer100g: cleanNumber(value.caloriesPer100g),
+    proteinPer100g: cleanNumber(value.proteinPer100g),
+    carbsPer100g: cleanNumber(value.carbsPer100g),
+    fatPer100g: cleanNumber(value.fatPer100g),
+  };
+}
+
+async function fileToBase64(file: File) {
+  const buffer = await file.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+
+  for (let index = 0; index < bytes.byteLength; index += 1) {
+    binary += String.fromCharCode(bytes[index]);
+  }
+
+  return btoa(binary);
 }
 
 export async function parseMealWithGemini(input: string, apiKey: string): Promise<ParsedMeal> {
@@ -194,5 +224,96 @@ export async function parseMealWithGemini(input: string, apiKey: string): Promis
     return normalizeParsedMeal(JSON.parse(text), trimmedInput);
   } catch {
     throw new Error("Gemini returned an estimate I could not read. Try a shorter meal description.");
+  }
+}
+
+export async function estimateFoodLabelWithGemini(file: File, apiKey: string): Promise<LabelNutritionEstimate> {
+  if (!apiKey.trim()) {
+    throw new Error("Add your Gemini API key before using label scanning.");
+  }
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Choose a food label photo.");
+  }
+
+  const imageData = await fileToBase64(file);
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey.trim(),
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              text: [
+                "Read this nutrition label for a personal calorie tracker.",
+                "Return calories and macros per 100g only.",
+                "If the label uses a serving size instead of 100g, convert the nutrition to per 100g using the serving size.",
+                "Use grams. If the image is unclear, make the best estimate and keep the food name generic.",
+                "Return JSON only. Do not include commentary.",
+              ].join("\n"),
+            },
+            {
+              inlineData: {
+                mimeType: file.type,
+                data: imageData,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            name: { type: "STRING" },
+            caloriesPer100g: { type: "INTEGER" },
+            proteinPer100g: { type: "INTEGER" },
+            carbsPer100g: { type: "INTEGER" },
+            fatPer100g: { type: "INTEGER" },
+          },
+          required: ["name", "caloriesPer100g", "proteinPer100g", "carbsPer100g", "fatPer100g"],
+        },
+      },
+    }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as GeminiGenerateContentResponse;
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("Gemini rejected this API key. Replace it and try again.");
+    }
+
+    if (response.status === 429) {
+      throw new Error("Gemini rate limit reached. Try again later.");
+    }
+
+    throw new Error(payload.error?.message ?? "Gemini could not read this label.");
+  }
+
+  const text = readGeminiText(payload);
+  if (!text) {
+    throw new Error("Gemini did not return a label estimate.");
+  }
+
+  try {
+    const estimate = normalizeLabelEstimate(JSON.parse(text));
+    if (estimate.caloriesPer100g <= 0) {
+      throw new Error("Gemini could not find calories on this label.");
+    }
+
+    return estimate;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error("Gemini returned a label estimate I could not read.");
   }
 }

@@ -953,13 +953,13 @@ button {
 }
 
 .meal-card {
-  min-height: 52px;
+  min-height: 58px;
   border-radius: 26px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 49px;
-  align-items: start;
-  gap: 0 10px;
-  padding: 7px 15px 7px 16px;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 0 8px;
+  padding: 8px 12px 8px 16px;
   color: var(--ink);
   background: var(--white);
   overflow: hidden;
@@ -983,7 +983,7 @@ button {
 
 .meal-toggle {
   min-width: 0;
-  min-height: 38px;
+  min-height: 42px;
   display: flex;
   align-items: center;
   text-align: left;
@@ -1018,7 +1018,7 @@ button {
   color: rgba(5, 5, 5, 0.66);
   font-size: 12px;
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1077,8 +1077,8 @@ button {
 }
 
 .add-meal-button {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   justify-self: end;
   align-self: start;
   background: var(--meadow-2);
@@ -1217,6 +1217,75 @@ button {
   margin-bottom: 14px;
   padding: 12px;
   border-radius: 16px;
+  background: #eef6e7;
+}
+
+.label-scan-panel {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border-radius: 14px;
+  background: #eef6e7;
+}
+
+.label-scan-panel-inline {
+  margin-top: 12px;
+  background: var(--white);
+}
+
+.label-scan-panel > div:first-child,
+.label-estimate-card > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.label-scan-panel strong,
+.label-estimate-card strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.label-scan-panel span,
+.label-estimate-card span {
+  color: rgba(5, 5, 5, 0.6);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.photo-input-button {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.photo-input-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.label-estimate-card {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border-radius: 13px;
+  background: var(--white);
+}
+
+.label-scan-panel-inline .label-estimate-card {
   background: #eef6e7;
 }
 
