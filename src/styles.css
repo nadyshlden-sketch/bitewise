@@ -87,8 +87,11 @@ button {
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: hidden;
-  overflow-y: auto;
-  scroll-padding-bottom: 20px;
+  overflow-y: scroll;
+  padding-bottom: calc(70px + max(14px, env(safe-area-inset-bottom)));
+  scroll-padding-bottom: calc(70px + max(14px, env(safe-area-inset-bottom)));
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .onboarding-frame {
