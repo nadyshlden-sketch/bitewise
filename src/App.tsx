@@ -49,10 +49,35 @@ type MealLog = {
   aiItems?: ParsedMeal["items"];
 };
 
+type RecipeIngredient = {
+  id: string;
+  foodName: string;
+  serving: string;
+  amount: string;
+  unit: PortionUnit;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
+
+type SavedRecipe = {
+  id: string;
+  name: string;
+  cookedWeightGrams: number;
+  ingredients: RecipeIngredient[];
+  caloriesPer100g: number;
+  proteinPer100g: number;
+  carbsPer100g: number;
+  fatPer100g: number;
+  createdAt: string;
+};
+
 type StoredState = {
   version: number;
   profile: Profile | null;
   logs: MealLog[];
+  recipes: SavedRecipe[];
 };
 
 type MealSummary = {
@@ -129,12 +154,18 @@ type SelectedDatabaseFood = {
   unit: PortionUnit;
 };
 
+type RecipeDraft = {
+  name: string;
+  cookedWeightGrams: string;
+  ingredients: RecipeIngredient[];
+};
+
 type ToastState = {
   id: number;
   message: string;
 };
 
-const CURRENT_STORAGE_VERSION = 5;
+const CURRENT_STORAGE_VERSION = 6;
 const STORAGE_KEY = "bitewise-state-v5";
 
 const mealOrder: Array<Omit<MealSummary, "calories" | "items">> = [
@@ -161,6 +192,7 @@ const fallbackState: StoredState = {
   version: CURRENT_STORAGE_VERSION,
   profile: null,
   logs: [],
+  recipes: [],
 };
 
 const addNumber = (value: string) => {
@@ -283,6 +315,78 @@ function scaleDatabaseFood(entry: FoodDatabaseEntry, amountValue: string, unit: 
   };
 }
 
+function makeRecipeIngredient(entry: FoodDatabaseEntry) {
+  const details = getServingDetails(entry);
+  const scaled = scaleDatabaseFood(entry, details.defaultAmount, details.defaultUnit);
+
+  return {
+    id: makeId(),
+    foodName: entry.name,
+    serving: entry.serving,
+    amount: details.defaultAmount,
+    unit: details.defaultUnit,
+    calories: scaled.calories,
+    protein: scaled.protein,
+    carbs: scaled.carbs,
+    fat: scaled.fat,
+  } satisfies RecipeIngredient;
+}
+
+function updateRecipeIngredientNutrition(ingredient: RecipeIngredient, entry: FoodDatabaseEntry) {
+  const scaled = scaleDatabaseFood(entry, ingredient.amount, ingredient.unit);
+
+  return {
+    ...ingredient,
+    calories: scaled.calories,
+    protein: scaled.protein,
+    carbs: scaled.carbs,
+    fat: scaled.fat,
+  };
+}
+
+function getRecipeTotals(ingredients: RecipeIngredient[]) {
+  return ingredients.reduce(
+    (totals, ingredient) => ({
+      calories: totals.calories + ingredient.calories,
+      protein: totals.protein + ingredient.protein,
+      carbs: totals.carbs + ingredient.carbs,
+      fat: totals.fat + ingredient.fat,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  );
+}
+
+function calculateRecipeNutrition(draft: RecipeDraft) {
+  const cookedWeight = addNumber(draft.cookedWeightGrams);
+  const totals = getRecipeTotals(draft.ingredients);
+  const ratio = cookedWeight > 0 ? 100 / cookedWeight : 0;
+
+  return {
+    cookedWeight,
+    totals,
+    per100g: {
+      calories: Math.round(totals.calories * ratio),
+      protein: Math.round(totals.protein * ratio),
+      carbs: Math.round(totals.carbs * ratio),
+      fat: Math.round(totals.fat * ratio),
+    },
+  };
+}
+
+function scaleRecipePortion(recipe: SavedRecipe, gramsValue: string) {
+  const grams = addNumber(gramsValue);
+  const ratio = grams / 100;
+
+  return {
+    grams,
+    title: `${grams}g ${recipe.name}`,
+    calories: Math.round(recipe.caloriesPer100g * ratio),
+    protein: Math.round(recipe.proteinPer100g * ratio),
+    carbs: Math.round(recipe.carbsPer100g * ratio),
+    fat: Math.round(recipe.fatPer100g * ratio),
+  };
+}
+
 function foodSignature(log: MealLog) {
   return [log.title.trim().toLowerCase(), log.calories, log.protein, log.carbs, log.fat].join("|");
 }
@@ -335,15 +439,26 @@ function loadStoredState(): StoredState {
     }
 
     const parsed = JSON.parse(raw) as Partial<StoredState>;
-    if (parsed.version !== CURRENT_STORAGE_VERSION) {
+    if (!parsed.version || parsed.version > CURRENT_STORAGE_VERSION) {
       return fallbackState;
     }
 
     const profile = parsed.profile ? { ...calculateNutritionTargets(parsed.profile), ...parsed.profile } : null;
-    return { ...fallbackState, ...parsed, profile, logs: normalizeStoredLogs(parsed.logs ?? []) };
+    return {
+      ...fallbackState,
+      ...parsed,
+      version: CURRENT_STORAGE_VERSION,
+      profile,
+      logs: normalizeStoredLogs(parsed.logs ?? []),
+      recipes: normalizeStoredRecipes(parsed.recipes ?? []),
+    };
   } catch {
     return fallbackState;
   }
+}
+
+function normalizeStoredRecipes(recipes: SavedRecipe[]) {
+  return recipes.filter((recipe) => recipe.name && recipe.cookedWeightGrams > 0);
 }
 
 function normalizeStoredLogs(logs: MealLog[]) {
@@ -1003,13 +1118,23 @@ function MealCard({
 function MyFoodsSection({
   recent,
   frequent,
+  recipes,
   onRelogFood,
+  onSaveRecipe,
+  onLogRecipe,
+  onDeleteRecipe,
 }: {
   recent: MyFoodEntry[];
   frequent: MyFoodEntry[];
+  recipes: SavedRecipe[];
   onRelogFood: (entry: MyFoodEntry, mealName: MealName) => void;
+  onSaveRecipe: (recipe: SavedRecipe) => void;
+  onLogRecipe: (recipe: SavedRecipe, mealName: MealName, grams: string) => void;
+  onDeleteRecipe: (id: string) => void;
 }) {
   const [selectedMeal, setSelectedMeal] = useState<MealName>("Breakfast");
+  const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
+  const [recipePortions, setRecipePortions] = useState<Record<string, string>>({});
 
   const renderFoodCard = (entry: MyFoodEntry, label: "recent" | "frequent") => (
     <article className="my-food-card" key={`${label}-${entry.signature}`}>
@@ -1039,9 +1164,9 @@ function MyFoodsSection({
         <p>Pick today's meal, then add foods from your history.</p>
       </div>
 
-      {recent.length === 0 && frequent.length === 0 ? <p className="my-foods-empty">Foods you log will appear here automatically.</p> : null}
+      {recent.length === 0 && frequent.length === 0 && recipes.length === 0 ? <p className="my-foods-empty">Foods you log will appear here automatically.</p> : null}
 
-      {recent.length > 0 || frequent.length > 0 ? (
+      {recent.length > 0 || frequent.length > 0 || recipes.length > 0 ? (
         <section className="my-foods-meal-picker" aria-label="Choose meal for saved foods">
           <p>Log to</p>
           <div>
@@ -1059,6 +1184,67 @@ function MyFoodsSection({
         </section>
       ) : null}
 
+      <section className="recipes-panel" aria-label="Saved recipes">
+        <div className="recipes-panel-header">
+          <div>
+            <h2>Recipes</h2>
+            <p>Save cooked recipes and log any gram portion.</p>
+          </div>
+          <button className="compact-action-button" type="button" onClick={() => setIsRecipeBuilderOpen((current) => !current)}>
+            {isRecipeBuilderOpen ? "Close" : "New recipe"}
+          </button>
+        </div>
+
+        {isRecipeBuilderOpen ? <RecipeBuilder onSave={(recipe) => {
+          onSaveRecipe(recipe);
+          setIsRecipeBuilderOpen(false);
+        }} /> : null}
+
+        {recipes.length > 0 ? (
+          <div className="recipe-list">
+            {recipes.map((recipe) => {
+              const portion = recipePortions[recipe.id] ?? "100";
+              const scaled = scaleRecipePortion(recipe, portion);
+
+              return (
+                <article className="recipe-card" key={recipe.id}>
+                  <div className="recipe-card-copy">
+                    <strong>{recipe.name}</strong>
+                    <span>
+                      per 100g: {recipe.caloriesPer100g} kcal · P {recipe.proteinPer100g}g · C {recipe.carbsPer100g}g · F {recipe.fatPer100g}g
+                    </span>
+                    <small>{recipe.ingredients.length} ingredients · {recipe.cookedWeightGrams}g cooked</small>
+                  </div>
+                  <div className="recipe-log-controls">
+                    <label className="compact-field">
+                      Portion, g
+                      <input
+                        inputMode="numeric"
+                        value={portion}
+                        onChange={(event) => setRecipePortions((current) => ({ ...current, [recipe.id]: event.target.value }))}
+                      />
+                    </label>
+                    <div className="recipe-log-summary">
+                      <span>
+                        {scaled.calories} kcal · P {scaled.protein}g · C {scaled.carbs}g · F {scaled.fat}g
+                      </span>
+                      <button className="my-food-add-button" type="button" disabled={scaled.grams <= 0} onClick={() => onLogRecipe(recipe, selectedMeal, portion)}>
+                        Add
+                      </button>
+                      <button className="food-action-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => onDeleteRecipe(recipe.id)}>
+                        <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="my-foods-empty">No saved recipes yet.</p>
+        )}
+      </section>
+
       {recent.length > 0 ? (
         <div className="my-foods-group">
           <h2>Recent</h2>
@@ -1073,6 +1259,144 @@ function MyFoodsSection({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function RecipeBuilder({ onSave }: { onSave: (recipe: SavedRecipe) => void }) {
+  const [draft, setDraft] = useState<RecipeDraft>({ name: "", cookedWeightGrams: "", ingredients: [] });
+  const [ingredientQuery, setIngredientQuery] = useState("");
+  const ingredientMatches = useMemo(() => findFoodDatabaseMatches(ingredientQuery, 6), [ingredientQuery]);
+  const nutrition = useMemo(() => calculateRecipeNutrition(draft), [draft]);
+  const canSave = draft.name.trim().length > 0 && nutrition.cookedWeight > 0 && draft.ingredients.length > 0;
+
+  const addIngredient = (entry: FoodDatabaseEntry) => {
+    setDraft((current) => ({ ...current, ingredients: [...current.ingredients, makeRecipeIngredient(entry)] }));
+    setIngredientQuery("");
+  };
+
+  const updateIngredient = (ingredientId: string, next: Partial<Pick<RecipeIngredient, "amount" | "unit">>) => {
+    setDraft((current) => ({
+      ...current,
+      ingredients: current.ingredients.map((ingredient) => {
+        if (ingredient.id !== ingredientId) {
+          return ingredient;
+        }
+
+        const databaseEntry = findFoodDatabaseMatches(ingredient.foodName, 1)[0];
+        return databaseEntry ? updateRecipeIngredientNutrition({ ...ingredient, ...next }, databaseEntry) : { ...ingredient, ...next };
+      }),
+    }));
+  };
+
+  const removeIngredient = (ingredientId: string) => {
+    setDraft((current) => ({ ...current, ingredients: current.ingredients.filter((ingredient) => ingredient.id !== ingredientId) }));
+  };
+
+  const saveRecipe = () => {
+    if (!canSave) {
+      return;
+    }
+
+    onSave({
+      id: makeId(),
+      name: draft.name.trim(),
+      cookedWeightGrams: nutrition.cookedWeight,
+      ingredients: draft.ingredients,
+      caloriesPer100g: nutrition.per100g.calories,
+      proteinPer100g: nutrition.per100g.protein,
+      carbsPer100g: nutrition.per100g.carbs,
+      fatPer100g: nutrition.per100g.fat,
+      createdAt: new Date().toISOString(),
+    });
+    setDraft({ name: "", cookedWeightGrams: "", ingredients: [] });
+  };
+
+  return (
+    <div className="recipe-builder">
+      <label className="field-label">
+        Recipe name
+        <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Pancakes" />
+      </label>
+
+      <label className="field-label">
+        Add ingredient
+        <input value={ingredientQuery} onChange={(event) => setIngredientQuery(event.target.value)} placeholder="Flour, egg, milk..." />
+      </label>
+
+      {ingredientQuery.trim() ? (
+        <div className="database-results recipe-ingredient-results" aria-label="Ingredient matches">
+          {ingredientMatches.length > 0 ? (
+            ingredientMatches.map((entry) => (
+              <button className="database-result" key={`${entry.name}-${entry.serving}`} type="button" onClick={() => addIngredient(entry)}>
+                <span>
+                  <strong>{entry.name}</strong>
+                  <small>{entry.serving}</small>
+                </span>
+                <span className="database-result-nutrition">
+                  <strong>{entry.calories} kcal</strong>
+                  <small>
+                    P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+                  </small>
+                </span>
+              </button>
+            ))
+          ) : (
+            <p className="database-empty">No ingredient match yet</p>
+          )}
+        </div>
+      ) : null}
+
+      {draft.ingredients.length > 0 ? (
+        <div className="recipe-ingredient-list">
+          {draft.ingredients.map((ingredient) => {
+            const databaseEntry = findFoodDatabaseMatches(ingredient.foodName, 1)[0];
+            const details = databaseEntry ? getServingDetails(databaseEntry) : null;
+
+            return (
+              <article className="recipe-ingredient-row" key={ingredient.id}>
+                <div>
+                  <strong>{ingredient.foodName}</strong>
+                  <span>
+                    {ingredient.calories} kcal · P {ingredient.protein}g · C {ingredient.carbs}g · F {ingredient.fat}g
+                  </span>
+                </div>
+                <div className="recipe-ingredient-controls">
+                  <input inputMode="decimal" value={ingredient.amount} onChange={(event) => updateIngredient(ingredient.id, { amount: event.target.value })} />
+                  <select value={ingredient.unit} onChange={(event) => updateIngredient(ingredient.id, { unit: event.target.value as PortionUnit })}>
+                    <option value="serving">{details?.baseLabel ?? "serving"}</option>
+                    {details?.grams ? <option value="g">grams</option> : null}
+                  </select>
+                  <button className="food-action-button" type="button" aria-label={`Remove ${ingredient.foodName}`} onClick={() => removeIngredient(ingredient.id)}>
+                    <X size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <label className="field-label">
+        Finished cooked weight, g
+        <input
+          inputMode="numeric"
+          value={draft.cookedWeightGrams}
+          onChange={(event) => setDraft((current) => ({ ...current, cookedWeightGrams: event.target.value }))}
+          placeholder="360"
+        />
+      </label>
+
+      <div className="recipe-total-card" aria-label="Recipe nutrition estimate">
+        <span>Total: {nutrition.totals.calories} kcal</span>
+        <strong>
+          per 100g: {nutrition.per100g.calories} kcal · P {nutrition.per100g.protein}g · C {nutrition.per100g.carbs}g · F {nutrition.per100g.fat}g
+        </strong>
+      </div>
+
+      <button className="save-meal-button" type="button" disabled={!canSave} onClick={saveRecipe}>
+        Save recipe
+      </button>
+    </div>
   );
 }
 
@@ -1466,7 +1790,7 @@ export function App() {
   const frameRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const { profile, logs } = storedState;
+  const { profile, logs, recipes } = storedState;
   const dateIndicator = getDateIndicator(selectedDateKey);
 
   useEffect(() => {
@@ -1596,6 +1920,53 @@ export function App() {
       protein: entry.protein,
       carbs: entry.carbs,
       fat: entry.fat,
+    };
+
+    setStoredState((current) => ({
+      ...current,
+      version: CURRENT_STORAGE_VERSION,
+      logs: [...current.logs, nextLog],
+    }));
+    setExpandedMeal(mealName);
+    showToast(`Added to ${mealName}`);
+  };
+
+  const saveRecipe = (recipe: SavedRecipe) => {
+    setStoredState((current) => ({
+      ...current,
+      version: CURRENT_STORAGE_VERSION,
+      recipes: [recipe, ...current.recipes],
+    }));
+    showToast("Recipe saved");
+  };
+
+  const deleteRecipe = (id: string) => {
+    setStoredState((current) => ({
+      ...current,
+      version: CURRENT_STORAGE_VERSION,
+      recipes: current.recipes.filter((recipe) => recipe.id !== id),
+    }));
+    showToast("Recipe deleted");
+  };
+
+  const logRecipe = (recipe: SavedRecipe, mealName: MealName, gramsValue: string) => {
+    const scaled = scaleRecipePortion(recipe, gramsValue);
+
+    if (scaled.grams <= 0 || scaled.calories <= 0) {
+      return;
+    }
+
+    const nextLog: MealLog = {
+      id: makeId(),
+      kind: "meal",
+      dateKey: selectedDateKey,
+      loggedAt: new Date().toISOString(),
+      mealName,
+      title: scaled.title,
+      calories: scaled.calories,
+      protein: scaled.protein,
+      carbs: scaled.carbs,
+      fat: scaled.fat,
     };
 
     setStoredState((current) => ({
@@ -1743,7 +2114,15 @@ export function App() {
               </div>
             </>
           ) : activeView === "foods" ? (
-            <MyFoodsSection recent={myFoods.recent} frequent={myFoods.frequent} onRelogFood={relogFood} />
+            <MyFoodsSection
+              recent={myFoods.recent}
+              frequent={myFoods.frequent}
+              recipes={recipes}
+              onRelogFood={relogFood}
+              onSaveRecipe={saveRecipe}
+              onLogRecipe={logRecipe}
+              onDeleteRecipe={deleteRecipe}
+            />
           ) : (
             <SettingsScreen
               profile={profile}

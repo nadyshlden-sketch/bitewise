@@ -643,6 +643,166 @@ button {
   cursor: pointer;
 }
 
+.my-food-add-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.recipes-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.recipes-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recipes-panel-header h2,
+.recipes-panel-header p {
+  margin: 0;
+}
+
+.recipes-panel-header h2 {
+  color: rgba(5, 5, 5, 0.78);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.recipes-panel-header p {
+  margin-top: 4px;
+  color: rgba(5, 5, 5, 0.56);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.compact-action-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-radius: 999px;
+  background: var(--primary-cta);
+  color: var(--primary-cta-text);
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.recipe-builder,
+.recipe-card {
+  display: grid;
+  gap: 10px;
+  border-radius: 16px;
+  background: var(--white);
+}
+
+.recipe-builder {
+  padding: 13px;
+}
+
+.recipe-ingredient-results {
+  margin-top: -4px;
+}
+
+.recipe-ingredient-list,
+.recipe-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recipe-ingredient-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 13px;
+  background: #eef6e7;
+}
+
+.recipe-ingredient-row > div:first-child,
+.recipe-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.recipe-ingredient-row strong,
+.recipe-card-copy strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.recipe-ingredient-row span,
+.recipe-card-copy span,
+.recipe-card-copy small,
+.recipe-log-summary span,
+.recipe-total-card span,
+.recipe-total-card strong {
+  color: rgba(5, 5, 5, 0.6);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.recipe-ingredient-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) 28px;
+  gap: 7px;
+  align-items: center;
+}
+
+.recipe-ingredient-controls input,
+.recipe-ingredient-controls select,
+.compact-field input {
+  min-width: 0;
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  outline: 0;
+  background: var(--white);
+  color: var(--ink);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.recipe-total-card {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: #eef6e7;
+}
+
+.recipe-card {
+  padding: 12px;
+}
+
+.recipe-log-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.compact-field {
+  display: grid;
+  gap: 5px;
+  color: rgba(5, 5, 5, 0.66);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.recipe-log-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(72px, auto) 28px;
+  align-items: center;
+  gap: 8px;
+}
+
 .meal-card {
   min-height: 52px;
   border-radius: 26px;
