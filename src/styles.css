@@ -1,9 +1,29 @@
 :root {
   color-scheme: light;
-  font-family: "Poppins", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   --white: #ffffff;
-  --ink: #050505;
-  --muted: rgba(5, 5, 5, 0.65);
+  --surface: #f9f9f9;
+  --surface-dim: #dadada;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f3f3f4;
+  --surface-container: #eeeeee;
+  --surface-container-high: #e8e8e8;
+  --surface-container-highest: #e2e2e2;
+  --surface-variant: #e2e2e2;
+  --on-surface: #1a1c1c;
+  --on-surface-variant: #41493e;
+  --outline: #71796d;
+  --outline-variant: #c1c9ba;
+  --primary: #99d98c;
+  --on-primary: #1a1c1c;
+  --primary-strong: #306b2b;
+  --on-primary-strong: #ffffff;
+  --secondary: #34a0a4;
+  --on-secondary: #ffffff;
+  --tertiary: #168aad;
+  --on-tertiary: #ffffff;
+  --error: #ba1a1a;
+  --on-error-container: #93000a;
   --meadow-1: #d9ed92;
   --meadow-2: #b5e48c;
   --meadow-3: #99d98c;
@@ -14,12 +34,21 @@
   --meadow-8: #1a759f;
   --meadow-9: #1e6091;
   --meadow-10: #184e77;
-  --primary-cta: #b5e48c;
-  --primary-cta-text: #050505;
-  --page-bg: #eeeeee;
-  --card-radius: 21px;
-  --edge: 16px;
-  --frame-max: 414px;
+  --ink: #1a2e22;
+  --muted: #526e5d;
+  --text-soft: rgba(26, 46, 34, 0.56);
+  --text-subtle: rgba(26, 46, 34, 0.68);
+  --primary-cta: #99d98c;
+  --primary-cta-text: #1a1c1c;
+  --page-bg: #f8faf7;
+  --card-radius: 24px;
+  --control-radius: 16px;
+  --field-bg: #f3f3f4;
+  --shadow-soft: 0 8px 24px rgba(26, 46, 34, 0.06);
+  --shadow-card: 0 14px 34px rgba(26, 46, 34, 0.1);
+  --shadow-nav: 0 8px 24px rgba(26, 46, 34, 0.08);
+  --edge: 20px;
+  --frame-max: 480px;
 }
 
 * {
@@ -33,14 +62,14 @@ body,
 }
 
 html {
-  font-family: "Poppins", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
 }
 
 body {
   margin: 0;
-  background: var(--page-bg);
+  background: linear-gradient(180deg, #f8faf7 0%, #f3f7ef 100%);
   color: var(--ink);
-  font-family: "Poppins", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }
@@ -50,7 +79,7 @@ input,
 textarea,
 select {
   font: inherit;
-  font-family: "Poppins", sans-serif;
+  font-family: "Plus Jakarta Sans", sans-serif;
 }
 
 fieldset {
@@ -104,24 +133,31 @@ button {
   flex: 0 0 auto;
 }
 
-.onboarding-header p {
+.onboarding-header p,
+.my-foods-header span,
+.settings-header p {
   width: fit-content;
-  margin: 0 0 13px;
-  padding: 8px 15px;
+  margin: 0;
+  padding: 7px 13px;
   border-radius: 999px;
   background: var(--meadow-2);
   color: var(--ink);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1;
+}
+
+.onboarding-header p {
+  margin-bottom: 13px;
 }
 
 .onboarding-header h1 {
   max-width: 10ch;
   margin: 0;
   color: var(--ink);
-  font-size: clamp(34px, 11vw, 45px);
+  font-size: 32px;
   font-weight: 700;
-  line-height: 0.98;
+  line-height: 40px;
   letter-spacing: 0;
 }
 
@@ -152,14 +188,14 @@ button {
 
 .onboarding-calories {
   display: block;
-  font-size: clamp(38px, 12vw, 50px);
+  font-size: 48px;
   font-weight: 700;
   line-height: 1;
 }
 
 .onboarding-summary p {
   margin: 4px 0 0;
-  color: rgba(5, 5, 5, 0.72);
+  color: var(--text-subtle);
   font-size: 16px;
   line-height: 1.1;
 }
@@ -181,7 +217,7 @@ button {
   max-width: 160px;
   display: grid;
   gap: 5px;
-  color: rgba(5, 5, 5, 0.65);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
 }
@@ -221,13 +257,13 @@ button {
 
 .onboarding-macro-grid strong {
   color: var(--ink);
-  font-size: clamp(14px, 3.9vw, 16px);
+  font-size: 14px;
   font-weight: 700;
 }
 
 .onboarding-macro-grid small {
   margin-top: 4px;
-  color: rgba(5, 5, 5, 0.66);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
 }
@@ -239,7 +275,7 @@ button {
   color: var(--ink);
   padding: 0 13px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
   justify-self: start;
 }
@@ -279,7 +315,7 @@ button {
 
 .date-header h1 {
   margin: 0;
-  font-size: clamp(15px, 4.1vw, 17px);
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
   text-align: center;
@@ -304,7 +340,7 @@ button {
   width: 44px;
   height: 44px;
   background: var(--meadow-2);
-  color: #1b1c20;
+  color: var(--on-surface);
   padding: 0;
 }
 
@@ -319,9 +355,11 @@ button {
 
 .summary-card {
   min-height: clamp(244px, 66vw, 270px);
-  padding: clamp(22px, 6vw, 28px) clamp(18px, 5.8vw, 24px) clamp(18px, 5vw, 21px);
-  border-radius: 21px;
-  background: var(--meadow-2);
+  padding: 22px clamp(18px, 5.8vw, 24px) 18px;
+  border-radius: var(--card-radius);
+  background:
+    linear-gradient(145deg, rgba(217, 237, 146, 0.86) 0%, rgba(181, 228, 140, 0.96) 44%, rgba(153, 217, 140, 0.94) 100%);
+  box-shadow: var(--shadow-card);
   margin-bottom: 16px;
   flex: 0 0 auto;
 }
@@ -351,8 +389,13 @@ button {
 }
 
 .arc-progress {
-  stroke: var(--meadow-7);
+  stroke: url("#calorieArcGradient");
+  filter: drop-shadow(0 5px 8px rgba(24, 78, 119, 0.2));
   transition: stroke-dashoffset 240ms ease;
+}
+
+.arc-progress-over {
+  stroke: var(--primary-strong);
 }
 
 .calorie-copy {
@@ -374,13 +417,13 @@ button {
 }
 
 .calorie-copy strong {
-  font-size: clamp(34px, 9.6vw, 42px);
+  font-size: 42px;
   font-weight: 700;
   letter-spacing: 0;
 }
 
 .calorie-copy p span {
-  font-size: clamp(17px, 4.9vw, 20px);
+  font-size: 20px;
   font-weight: 400;
   color: var(--muted);
 }
@@ -388,10 +431,33 @@ button {
 .calorie-copy > span {
   display: block;
   margin-top: 5px;
-  font-size: clamp(14px, 3.9vw, 16px);
+  font-size: 16px;
   font-weight: 400;
   line-height: 1;
-  color: rgba(5, 5, 5, 0.7);
+  color: var(--text-subtle);
+}
+
+.calorie-eaten {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin: -4px auto 15px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.calorie-eaten strong {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .macro-grid {
@@ -412,14 +478,14 @@ button {
 }
 
 .macro-value {
-  font-size: clamp(12px, 3.4vw, 14px);
-  color: rgba(5, 5, 5, 0.6);
+  font-size: 14px;
+  color: var(--muted);
   white-space: nowrap;
 }
 
 .macro-value strong {
   color: var(--ink);
-  font-size: clamp(13px, 3.7vw, 15px);
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -441,7 +507,7 @@ button {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--meadow-7);
+  background: linear-gradient(90deg, var(--meadow-10), var(--meadow-8), var(--secondary));
   transition: width 240ms ease;
 }
 
@@ -459,38 +525,35 @@ button {
 
 .my-foods-header {
   display: grid;
-  gap: 6px;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.settings-header {
+  display: grid;
+  gap: 4px;
   margin-bottom: 2px;
 }
 
 .my-foods-header h1,
+.settings-header h1,
 .my-foods-group h2 {
   margin: 0;
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
-.my-foods-header span {
-  width: fit-content;
-  border-radius: 999px;
-  background: var(--meadow-2);
-  color: var(--ink);
-  padding: 7px 13px;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.my-foods-header h1 {
-  font-size: clamp(34px, 10vw, 42px);
-  line-height: 1;
+.my-foods-header h1,
+.settings-header h1 {
+  font-size: 32px;
+  line-height: 40px;
 }
 
 .my-foods-header p,
 .my-foods-empty {
   margin: 0;
-  color: rgba(5, 5, 5, 0.56);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.35;
@@ -498,39 +561,8 @@ button {
 
 .my-foods-empty {
   padding: 16px;
-  border-radius: 18px;
+  border-radius: var(--control-radius);
   background: var(--white);
-}
-
-.my-foods-meal-picker {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: grid;
-  gap: 8px;
-  margin: 0 calc(var(--edge) * -1);
-  padding: 10px var(--edge);
-  background: rgba(238, 238, 238, 0.94);
-  backdrop-filter: blur(12px);
-}
-
-.my-foods-meal-picker p {
-  margin: 0;
-  color: rgba(5, 5, 5, 0.64);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.my-foods-meal-picker > div {
-  display: flex;
-  gap: 7px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.my-foods-meal-picker > div::-webkit-scrollbar {
-  display: none;
 }
 
 .meal-pill {
@@ -538,10 +570,10 @@ button {
   min-height: 36px;
   border-radius: 999px;
   background: var(--white);
-  color: rgba(5, 5, 5, 0.62);
+  color: var(--muted);
   padding: 0 13px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -556,7 +588,7 @@ button {
 }
 
 .my-foods-group h2 {
-  color: rgba(5, 5, 5, 0.68);
+  color: var(--text-subtle);
   font-size: 12px;
 }
 
@@ -590,6 +622,7 @@ button {
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+  box-shadow: var(--shadow-soft);
 }
 
 .my-food-card-copy {
@@ -610,7 +643,7 @@ button {
   overflow: hidden;
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -618,7 +651,7 @@ button {
 
 .my-food-meta,
 .my-food-macros {
-  color: rgba(5, 5, 5, 0.58);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
@@ -632,7 +665,7 @@ button {
   color: var(--primary-cta-text);
   padding: 0 14px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -659,15 +692,15 @@ button {
 }
 
 .recipes-panel-header h2 {
-  color: rgba(5, 5, 5, 0.78);
+  color: var(--on-surface-variant);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.1;
 }
 
 .recipes-panel-header p {
   margin-top: 4px;
-  color: rgba(5, 5, 5, 0.56);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
@@ -681,7 +714,7 @@ button {
   color: var(--primary-cta-text);
   padding: 0 14px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -691,6 +724,7 @@ button {
   gap: 10px;
   border-radius: 16px;
   background: var(--white);
+  box-shadow: var(--shadow-soft);
 }
 
 .recipe-builder {
@@ -712,7 +746,7 @@ button {
   gap: 8px;
   padding: 10px;
   border-radius: 13px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .recipe-ingredient-row > div:first-child,
@@ -726,7 +760,7 @@ button {
 .recipe-card-copy strong {
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.15;
 }
 
@@ -736,7 +770,7 @@ button {
 .recipe-log-summary span,
 .recipe-total-card span,
 .recipe-total-card strong {
-  color: rgba(5, 5, 5, 0.6);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
@@ -761,7 +795,7 @@ button {
   color: var(--ink);
   padding: 0 12px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .recipe-total-card {
@@ -769,7 +803,7 @@ button {
   gap: 4px;
   padding: 11px 12px;
   border-radius: 14px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .recipe-card {
@@ -812,12 +846,12 @@ button {
 .recipe-card-main strong {
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .recipe-card-main small {
   margin-top: 3px;
-  color: rgba(5, 5, 5, 0.58);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
 }
@@ -829,9 +863,9 @@ button {
 .compact-field {
   display: grid;
   gap: 5px;
-  color: rgba(5, 5, 5, 0.66);
+  color: var(--muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .recipe-log-summary {
@@ -860,7 +894,7 @@ button {
   border-radius: 24px;
   background: var(--white);
   padding: 14px;
-  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-soft);
 }
 
 .my-food-dialog .sheet-header {
@@ -875,7 +909,7 @@ button {
 .dialog-subtitle {
   display: block;
   margin-top: 5px;
-  color: rgba(5, 5, 5, 0.58);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
@@ -887,9 +921,9 @@ button {
 }
 
 .dialog-meal-picker legend {
-  color: rgba(5, 5, 5, 0.66);
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .dialog-meal-picker > div {
@@ -910,20 +944,20 @@ button {
   gap: 12px;
   padding: 12px 13px;
   border-radius: 16px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .dialog-total strong {
   color: var(--ink);
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
 }
 
 .dialog-total span {
-  color: rgba(5, 5, 5, 0.62);
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
   text-align: right;
 }
@@ -934,7 +968,7 @@ button {
   margin-bottom: 12px;
   padding: 12px;
   border-radius: 16px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .edit-portion-card > div:first-child {
@@ -945,12 +979,12 @@ button {
 .edit-portion-card strong {
   color: var(--ink);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.15;
 }
 
 .edit-portion-card span {
-  color: rgba(5, 5, 5, 0.62);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.25;
@@ -958,7 +992,7 @@ button {
 
 .meal-card {
   min-height: 58px;
-  border-radius: 26px;
+  border-radius: var(--card-radius);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 42px;
   align-items: center;
@@ -966,6 +1000,7 @@ button {
   padding: 8px 12px 8px 16px;
   color: var(--ink);
   background: var(--white);
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
@@ -1010,7 +1045,7 @@ button {
   display: flex;
   align-items: center;
   gap: 3px;
-  font-size: clamp(15px, 3.9vw, 16px);
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0;
@@ -1019,9 +1054,9 @@ button {
 .meal-details {
   display: block;
   margin-top: 4px;
-  color: rgba(5, 5, 5, 0.66);
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -1057,9 +1092,9 @@ button {
 .food-breakdown {
   display: block;
   margin-top: 3px;
-  color: rgba(5, 5, 5, 0.56);
+  color: var(--muted);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.25;
 }
 
@@ -1073,8 +1108,8 @@ button {
   width: 24px;
   height: 24px;
   padding: 0;
-  background: #eef6e7;
-  color: #2f3134;
+  background: var(--surface-container-low);
+  color: var(--on-surface);
   cursor: pointer;
 }
 
@@ -1084,15 +1119,15 @@ button {
   justify-self: end;
   align-self: start;
   background: var(--meadow-2);
-  color: #2f3134;
+  color: var(--on-surface);
   padding: 0;
 }
 
 .empty-meal {
   margin: 0;
-  color: rgba(5, 5, 5, 0.52);
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.25;
 }
 
@@ -1104,7 +1139,7 @@ button {
   align-items: end;
   justify-items: center;
   padding: 0 var(--edge);
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(26, 46, 34, 0.32);
 }
 
 .meal-sheet {
@@ -1112,9 +1147,9 @@ button {
   max-height: min(88svh, 760px);
   overflow-y: auto;
   padding: 10px var(--edge) max(22px, env(safe-area-inset-bottom));
-  border-radius: 28px 28px 0 0;
+  border-radius: var(--card-radius) var(--card-radius) 0 0;
   background: var(--white);
-  box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--shadow-soft);
 }
 
 .sheet-handle {
@@ -1122,7 +1157,7 @@ button {
   height: 5px;
   margin: 2px auto 18px;
   border-radius: 999px;
-  background: rgba(5, 5, 5, 0.18);
+  background: var(--outline-variant);
 }
 
 .sheet-header {
@@ -1156,7 +1191,7 @@ button {
   width: 38px;
   height: 38px;
   background: var(--meadow-2);
-  color: #1b1c20;
+  color: var(--on-surface);
 }
 
 .log-section {
@@ -1167,6 +1202,7 @@ button {
   padding: 14px;
   border-radius: 24px;
   background: var(--white);
+  box-shadow: var(--shadow-soft);
 }
 
 .log-section .sheet-header {
@@ -1190,8 +1226,8 @@ button {
   margin: -2px 0 14px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: #eef6e7;
-  color: rgba(5, 5, 5, 0.72);
+  background: var(--surface-container-low);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1219,7 +1255,7 @@ button {
   margin-bottom: 14px;
   padding: 12px;
   border-radius: 16px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .ai-compose-field,
@@ -1232,7 +1268,7 @@ button {
 .ingredient-compose-field label:first-child {
   display: grid;
   gap: 7px;
-  color: rgba(5, 5, 5, 0.72);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1247,7 +1283,7 @@ button {
   color: var(--ink);
   padding: 13px 54px 13px 14px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .ai-compose-field textarea {
@@ -1289,7 +1325,7 @@ button {
 
 .inline-status {
   margin: 0 0 12px;
-  color: rgba(5, 5, 5, 0.62);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.3;
@@ -1300,7 +1336,7 @@ button {
   gap: 9px;
   padding: 11px;
   border-radius: 14px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .label-scan-panel-inline {
@@ -1318,13 +1354,13 @@ button {
 .label-estimate-card strong {
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.15;
 }
 
 .label-scan-panel span,
 .label-estimate-card span {
-  color: rgba(5, 5, 5, 0.6);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
@@ -1340,7 +1376,7 @@ button {
   color: var(--primary-cta-text);
   padding: 0 14px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -1361,7 +1397,7 @@ button {
 }
 
 .label-scan-panel-inline .label-estimate-card {
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .ai-log-panel .field-label,
@@ -1377,7 +1413,7 @@ button {
 }
 
 .database-search-panel input {
-  background: #eef6e7;
+  background: var(--surface-container-low);
 }
 
 .database-results {
@@ -1394,7 +1430,7 @@ button {
   gap: 10px;
   padding: 10px 11px;
   border-radius: 12px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
   color: var(--ink);
   text-align: left;
   cursor: pointer;
@@ -1419,7 +1455,7 @@ button {
 
 .database-result small {
   margin-top: 4px;
-  color: rgba(5, 5, 5, 0.58);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
 }
@@ -1430,7 +1466,7 @@ button {
 
 .database-empty {
   margin: 0;
-  color: rgba(5, 5, 5, 0.58);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1460,7 +1496,7 @@ button {
 }
 
 .portion-card span {
-  color: rgba(5, 5, 5, 0.62);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1485,7 +1521,7 @@ button {
 
 .portion-summary span {
   min-width: 0;
-  color: rgba(5, 5, 5, 0.7);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 700;
   line-height: 1.2;
@@ -1498,7 +1534,7 @@ button {
   color: var(--primary-cta-text);
   padding: 0 18px;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -1519,7 +1555,7 @@ button {
   color: var(--ink);
   padding: 13px 14px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.35;
 }
 
@@ -1534,7 +1570,7 @@ button {
   background: var(--primary-cta);
   color: var(--primary-cta-text);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -1563,7 +1599,7 @@ button {
 }
 
 .ai-result-total span {
-  color: rgba(5, 5, 5, 0.68);
+  color: var(--text-subtle);
   font-size: 13px;
   font-weight: 600;
 }
@@ -1579,7 +1615,7 @@ button {
   min-width: 0;
   padding: 9px 8px;
   border-radius: 12px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
   text-align: center;
 }
 
@@ -1597,7 +1633,7 @@ button {
 
 .ai-result-macros small {
   margin-top: 4px;
-  color: rgba(5, 5, 5, 0.62);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
 }
@@ -1613,13 +1649,13 @@ button {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   padding: 7px 0;
-  color: rgba(5, 5, 5, 0.78);
+  color: var(--on-surface-variant);
   font-size: 12px;
   line-height: 1.2;
 }
 
 .ai-result li + li {
-  border-top: 1px solid rgba(5, 5, 5, 0.08);
+  border-top: 1px solid var(--outline-variant);
 }
 
 .ai-result li strong {
@@ -1639,7 +1675,7 @@ button {
 }
 
 .ai-item-copy small {
-  color: rgba(5, 5, 5, 0.56);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
@@ -1652,7 +1688,7 @@ button {
 }
 
 .segmented-field legend {
-  color: rgba(5, 5, 5, 0.72);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1674,9 +1710,9 @@ button {
 .segment {
   min-height: 44px;
   border-radius: 14px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
   color: var(--ink);
-  font-size: clamp(12px, 3.3vw, 14px);
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.1;
   cursor: pointer;
@@ -1692,7 +1728,7 @@ button {
   display: grid;
   gap: 7px;
   margin-bottom: 13px;
-  color: rgba(5, 5, 5, 0.72);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1703,11 +1739,11 @@ button {
   border: 2px solid transparent;
   border-radius: 14px;
   outline: 0;
-  background: #eef6e7;
+  background: var(--surface-container-low);
   color: var(--ink);
   padding: 0 14px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .field-label select {
@@ -1716,16 +1752,16 @@ button {
   border: 2px solid transparent;
   border-radius: 14px;
   outline: 0;
-  background: #eef6e7;
+  background: var(--surface-container-low);
   color: var(--ink);
   padding: 0 12px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .form-error {
   margin: 0 0 12px;
-  color: #9d1f1f;
+  color: var(--error);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.3;
@@ -1756,11 +1792,11 @@ button {
   justify-content: space-between;
   gap: 8px;
   border-radius: 14px;
-  background: #eef6e7;
-  color: rgba(5, 5, 5, 0.78);
+  background: var(--surface-container-low);
+  color: var(--on-surface-variant);
   padding: 0 13px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -1785,7 +1821,7 @@ button {
   background: var(--primary-cta);
   color: var(--primary-cta-text);
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -1802,8 +1838,8 @@ button {
   margin: -2px 0 14px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: #eef6e7;
-  color: rgba(5, 5, 5, 0.72);
+  background: var(--surface-container-low);
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1818,38 +1854,13 @@ button {
   gap: 16px;
 }
 
-.settings-header {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 2px;
-}
-
-.settings-header p {
-  width: fit-content;
-  margin: 0;
-  padding: 7px 13px;
-  border-radius: 999px;
-  background: var(--meadow-2);
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.settings-header h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(30px, 8vw, 38px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
-}
-
 .settings-card {
   display: grid;
   gap: 0;
   padding: 0;
-  border-radius: 18px;
+  border-radius: var(--control-radius);
   background: var(--white);
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
@@ -1875,12 +1886,12 @@ button {
 
 .settings-card-toggle strong {
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.1;
 }
 
 .settings-card-toggle small {
-  color: rgba(5, 5, 5, 0.6);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
@@ -1891,7 +1902,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(5, 5, 5, 0.72);
+  color: var(--text-subtle);
 }
 
 .settings-toggle-meta small {
@@ -1900,7 +1911,7 @@ button {
   color: var(--ink);
   padding: 5px 10px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .settings-panel-body {
@@ -1916,7 +1927,7 @@ button {
 .clear-key-button {
   min-height: 48px;
   border-radius: 999px;
-  background: #eef6e7;
+  background: var(--surface-container-low);
   color: var(--ink);
   font-size: 15px;
   font-weight: 700;
@@ -1938,7 +1949,7 @@ button {
   padding: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 45px rgba(20, 31, 25, 0.14);
+  box-shadow: var(--shadow-nav);
   backdrop-filter: blur(14px);
 }
 
@@ -1950,9 +1961,9 @@ button {
   gap: 6px;
   border-radius: 999px;
   background: transparent;
-  color: rgba(5, 5, 5, 0.58);
+  color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -1976,9 +1987,9 @@ button {
   background: var(--meadow-10);
   color: var(--white);
   padding: 0 16px;
-  box-shadow: 0 16px 34px rgba(20, 31, 25, 0.22);
+  box-shadow: var(--shadow-nav);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
   opacity: 0;
   pointer-events: none;
@@ -2023,7 +2034,7 @@ button {
 
 @media (min-width: 768px) {
   :root {
-    --frame-max: 640px;
+    --frame-max: 480px;
   }
 
   .phone-frame {
@@ -2042,14 +2053,9 @@ button {
     min-width: 0;
   }
 
-  .my-foods-meal-picker {
-    margin: 0;
-    padding: 10px 0;
-  }
-
   .meal-sheet {
-    width: min(calc(100vw - 48px), 640px);
-    border-radius: 28px 28px 0 0;
+    width: min(calc(100vw - 48px), var(--frame-max));
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
   }
 
   .ai-result li {
@@ -2059,7 +2065,7 @@ button {
 
 @media (min-width: 1120px) {
   :root {
-    --frame-max: 720px;
+    --frame-max: 480px;
   }
 
   .phone-frame {
@@ -2071,7 +2077,7 @@ button {
   }
 
   .meal-sheet {
-    width: min(calc(100vw - 64px), 720px);
+    width: min(calc(100vw - 64px), var(--frame-max));
   }
 }
 

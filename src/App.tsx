@@ -574,6 +574,7 @@ function getMyFoods(logs: MealLog[]) {
   return {
     recent: entries.slice(0, 5),
     frequent: [...entries]
+      .filter((entry) => entry.count >= 2)
       .sort((a, b) => b.count - a.count || new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime())
       .slice(0, 5),
   };
@@ -1155,19 +1156,30 @@ function CalorieArc({
   consumed: number;
   macros: Macro[];
 }) {
-  const remaining = Math.max(calorieGoal - consumed, 0);
+  const rawRemaining = calorieGoal - consumed;
+  const remaining = Math.max(rawRemaining, 0);
+  const overCalories = Math.max(consumed - calorieGoal, 0);
+  const primaryCalories = overCalories > 0 ? overCalories : remaining;
   const progress = Math.min(consumed / calorieGoal, 1);
   const radius = 102;
   const circumference = Math.PI * radius;
   const strokeOffset = circumference * (1 - progress);
+  const calorieStatus = overCalories > 0 ? `${overCalories} kcal over` : `${remaining} kcal left`;
 
   return (
     <section className="summary-card" aria-label="Daily calorie summary">
       <div className="arc-wrap">
-        <svg className="calorie-arc" viewBox="0 0 260 148" role="img" aria-label={`${remaining} calories left`}>
+        <svg className="calorie-arc" viewBox="0 0 260 148" role="img" aria-label={`${consumed} calories eaten, ${calorieStatus}`}>
+          <defs>
+            <linearGradient id="calorieArcGradient" x1="28" y1="122" x2="232" y2="122" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#184E77" />
+              <stop offset="52%" stopColor="#1A759F" />
+              <stop offset="100%" stopColor="#00696C" />
+            </linearGradient>
+          </defs>
           <path className="arc-track" d="M28 122a102 102 0 0 1 204 0" pathLength={circumference} />
           <path
-            className="arc-progress"
+            className={overCalories > 0 ? "arc-progress arc-progress-over" : "arc-progress"}
             d="M28 122a102 102 0 0 1 204 0"
             pathLength={circumference}
             style={{ strokeDasharray: circumference, strokeDashoffset: strokeOffset }}
@@ -1175,11 +1187,16 @@ function CalorieArc({
         </svg>
         <div className="calorie-copy">
           <p>
-            <strong>{remaining}</strong>
-            <span>/{calorieGoal}</span>
+            <strong>{primaryCalories}</strong>
+            <span>{overCalories > 0 ? "over" : `/${calorieGoal}`}</span>
           </p>
-          <span>Calories left</span>
+          <span>{overCalories > 0 ? "Calories over" : "Calories left"}</span>
         </div>
+      </div>
+
+      <div className="calorie-eaten" aria-label={`${consumed} calories eaten today`}>
+        <strong>{consumed}</strong>
+        <span>kcal eaten today</span>
       </div>
 
       <div className="macro-grid">
