@@ -1366,21 +1366,18 @@ function MyFoodsSection({
   };
 
   const renderFoodCard = (entry: MyFoodEntry, canDelete = false) => (
-    <article className={canDelete ? "recipe-card" : "recipe-card recipe-card-no-actions"} key={entry.signature}>
-      <button className="recipe-card-main" type="button" onClick={() => setLogTarget({ type: "food", entry })}>
-        <span>
-          <strong>{entry.title}</strong>
-          <small>{entry.portion?.type === "label" ? `${entry.portion.grams}g default portion` : canDelete ? "Saved portion" : `Last: ${entry.mealName}`}</small>
+    <article className="my-food-card" key={entry.signature}>
+      <button className="my-food-card-main" type="button" onClick={() => setLogTarget({ type: "food", entry })}>
+        <span className="my-food-title">{entry.title}</span>
+        <span className="my-food-meta">
+          {entry.calories} kcal · {entry.portion?.type === "label" ? `${entry.portion.grams}g default` : canDelete ? "Saved portion" : `Last: ${entry.mealName}`}
         </span>
-        <span>
-          <strong>{entry.calories} kcal</strong>
-          <small>
-            P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
-          </small>
+        <span className="my-food-macros">
+          P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
         </span>
       </button>
       {canDelete && entry.savedFoodId ? (
-        <button className="food-action-button recipe-delete-button" type="button" aria-label={`Delete ${entry.title}`} onClick={() => onDeleteSavedFood(entry.savedFoodId!)}>
+        <button className="food-action-button my-food-delete-button" type="button" aria-label={`Delete ${entry.title}`} onClick={() => onDeleteSavedFood(entry.savedFoodId!)}>
           <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
         </button>
       ) : null}
@@ -1449,14 +1446,14 @@ function MyFoodsSection({
       {saved.length > 0 ? (
         <div className="my-foods-group">
           <h2>Saved foods</h2>
-          <div className="recipe-list">{saved.map((entry) => renderFoodCard(entry, true))}</div>
+          <div className="my-foods-row">{saved.map((entry) => renderFoodCard(entry, true))}</div>
         </div>
       ) : null}
 
       {frequent.length > 0 ? (
         <div className="my-foods-group">
           <h2>Frequently added</h2>
-          <div className="recipe-list">{frequent.map((entry) => renderFoodCard(entry))}</div>
+          <div className="my-foods-row">{frequent.map((entry) => renderFoodCard(entry))}</div>
         </div>
       ) : null}
 

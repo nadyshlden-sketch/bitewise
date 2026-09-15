@@ -625,10 +625,22 @@ button {
   box-shadow: var(--shadow-soft);
 }
 
+.my-food-card-main,
 .my-food-card-copy {
   min-width: 0;
   display: grid;
   gap: 5px;
+}
+
+.my-food-card-main {
+  width: 100%;
+  flex: 1 1 auto;
+  align-content: start;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
 }
 
 .my-food-card-actions {
@@ -636,6 +648,11 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.my-food-delete-button {
+  align-self: end;
+  justify-self: end;
 }
 
 .my-food-title {
@@ -812,10 +829,6 @@ button {
   align-items: center;
   gap: 8px;
   padding: 12px;
-}
-
-.recipe-card-no-actions {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .recipe-card-main {
