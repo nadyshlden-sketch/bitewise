@@ -860,6 +860,12 @@ button {
   justify-self: end;
 }
 
+.recipe-card-actions {
+  display: grid;
+  gap: 6px;
+  justify-self: end;
+}
+
 .compact-field {
   display: grid;
   gap: 5px;

@@ -1352,7 +1352,18 @@ function MyFoodsSection({
   onDeleteSavedFood: (id: string) => void;
 }) {
   const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState<SavedRecipe | null>(null);
   const [logTarget, setLogTarget] = useState<MyFoodLogTarget | null>(null);
+
+  const openNewRecipe = () => {
+    setEditingRecipe(null);
+    setIsRecipeBuilderOpen((current) => !current);
+  };
+
+  const openRecipeEditor = (recipe: SavedRecipe) => {
+    setEditingRecipe(recipe);
+    setIsRecipeBuilderOpen(true);
+  };
 
   const renderFoodCard = (entry: MyFoodEntry) => (
     <button className="my-food-card" key={entry.signature} type="button" onClick={() => setLogTarget({ type: "food", entry })}>
@@ -1413,13 +1424,14 @@ function MyFoodsSection({
             <h2>Recipes</h2>
             <p>Save cooked recipes and log any gram portion.</p>
           </div>
-          <button className="compact-action-button" type="button" onClick={() => setIsRecipeBuilderOpen((current) => !current)}>
+          <button className="compact-action-button" type="button" onClick={openNewRecipe}>
             {isRecipeBuilderOpen ? "Close" : "New recipe"}
           </button>
         </div>
 
-        {isRecipeBuilderOpen ? <RecipeBuilder apiKey={apiKey} onNeedApiKey={onNeedApiKey} onSave={(recipe) => {
+        {isRecipeBuilderOpen ? <RecipeBuilder key={editingRecipe?.id ?? "new-recipe"} apiKey={apiKey} initialRecipe={editingRecipe} onNeedApiKey={onNeedApiKey} onSave={(recipe) => {
           onSaveRecipe(recipe);
+          setEditingRecipe(null);
           setIsRecipeBuilderOpen(false);
         }} /> : null}
 
@@ -1439,9 +1451,14 @@ function MyFoodsSection({
                     </small>
                   </span>
                 </button>
-                <button className="food-action-button recipe-delete-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => onDeleteRecipe(recipe.id)}>
-                  <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
-                </button>
+                <span className="recipe-card-actions">
+                  <button className="food-action-button" type="button" aria-label={`Edit ${recipe.name}`} onClick={() => openRecipeEditor(recipe)}>
+                    <Pencil size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                  <button className="food-action-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => onDeleteRecipe(recipe.id)}>
+                    <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                </span>
               </article>
             ))}
           </div>
@@ -1557,8 +1574,31 @@ function MyFoodLogDialog({
   );
 }
 
-function RecipeBuilder({ apiKey, onNeedApiKey, onSave }: { apiKey: string; onNeedApiKey: () => void; onSave: (recipe: SavedRecipe) => void }) {
-  const [draft, setDraft] = useState<RecipeDraft>({ name: "", cookedWeightGrams: "", ingredients: [] });
+function recipeDraftFromSaved(recipe: SavedRecipe | null): RecipeDraft {
+  return recipe
+    ? {
+        name: recipe.name,
+        cookedWeightGrams: String(recipe.cookedWeightGrams),
+        ingredients: recipe.ingredients.map((ingredient) => ({
+          ...ingredient,
+          id: ingredient.id || makeId(),
+        })),
+      }
+    : { name: "", cookedWeightGrams: "", ingredients: [] };
+}
+
+function RecipeBuilder({
+  apiKey,
+  initialRecipe,
+  onNeedApiKey,
+  onSave,
+}: {
+  apiKey: string;
+  initialRecipe: SavedRecipe | null;
+  onNeedApiKey: () => void;
+  onSave: (recipe: SavedRecipe) => void;
+}) {
+  const [draft, setDraft] = useState<RecipeDraft>(() => recipeDraftFromSaved(initialRecipe));
   const [ingredientQuery, setIngredientQuery] = useState("");
   const [labelEstimate, setLabelEstimate] = useState<LabelNutritionEstimate | null>(null);
   const [labelGrams, setLabelGrams] = useState("100");
@@ -1661,7 +1701,7 @@ function RecipeBuilder({ apiKey, onNeedApiKey, onSave }: { apiKey: string; onNee
     }
 
     onSave({
-      id: makeId(),
+      id: initialRecipe?.id ?? makeId(),
       name: draft.name.trim(),
       cookedWeightGrams: nutrition.cookedWeight,
       ingredients: draft.ingredients,
@@ -1669,7 +1709,7 @@ function RecipeBuilder({ apiKey, onNeedApiKey, onSave }: { apiKey: string; onNee
       proteinPer100g: nutrition.per100g.protein,
       carbsPer100g: nutrition.per100g.carbs,
       fatPer100g: nutrition.per100g.fat,
-      createdAt: new Date().toISOString(),
+      createdAt: initialRecipe?.createdAt ?? new Date().toISOString(),
     });
     setDraft({ name: "", cookedWeightGrams: "", ingredients: [] });
   };
@@ -1783,7 +1823,7 @@ function RecipeBuilder({ apiKey, onNeedApiKey, onSave }: { apiKey: string; onNee
       </div>
 
       <button className="save-meal-button" type="button" disabled={!canSave} onClick={saveRecipe}>
-        Save recipe
+        {initialRecipe ? "Save changes" : "Save recipe"}
       </button>
     </div>
   );
@@ -2631,12 +2671,13 @@ export function App() {
   };
 
   const saveRecipe = (recipe: SavedRecipe) => {
+    const didUpdate = recipes.some((currentRecipe) => currentRecipe.id === recipe.id);
     setStoredState((current) => ({
       ...current,
       version: CURRENT_STORAGE_VERSION,
-      recipes: [recipe, ...current.recipes],
+      recipes: didUpdate ? current.recipes.map((currentRecipe) => (currentRecipe.id === recipe.id ? recipe : currentRecipe)) : [recipe, ...current.recipes],
     }));
-    showToast("Recipe saved");
+    showToast(didUpdate ? "Recipe updated" : "Recipe saved");
   };
 
   const deleteRecipe = (id: string) => {
