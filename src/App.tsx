@@ -62,7 +62,8 @@ type PortionReference =
   | {
       type: "recipe";
       recipeId: string;
-      grams: string;
+      grams?: string;
+      pieces?: string;
     }
   | {
       type: "savedFood";
@@ -99,12 +100,19 @@ type RecipeIngredient = {
 type SavedRecipe = {
   id: string;
   name: string;
+  yieldType?: RecipeYieldType;
   cookedWeightGrams: number;
+  pieceCount?: number;
+  pieceName?: string;
   ingredients: RecipeIngredient[];
   caloriesPer100g: number;
   proteinPer100g: number;
   carbsPer100g: number;
   fatPer100g: number;
+  caloriesPerPiece?: number;
+  proteinPerPiece?: number;
+  carbsPerPiece?: number;
+  fatPerPiece?: number;
   createdAt: string;
 };
 
@@ -205,6 +213,7 @@ type TargetDraft = {
 type AppView = "home" | "foods" | "settings";
 
 type PortionUnit = "serving" | "g";
+type RecipeYieldType = "weight" | "pieces";
 
 type SelectedDatabaseFood = {
   entry: FoodDatabaseEntry;
@@ -214,7 +223,10 @@ type SelectedDatabaseFood = {
 
 type RecipeDraft = {
   name: string;
+  yieldType: RecipeYieldType;
   cookedWeightGrams: string;
+  pieceCount: string;
+  pieceName: string;
   ingredients: RecipeIngredient[];
 };
 
@@ -446,25 +458,86 @@ function getRecipeTotals(ingredients: RecipeIngredient[]) {
   );
 }
 
+function getRecipeYieldType(recipe: Pick<SavedRecipe, "yieldType">) {
+  return recipe.yieldType === "pieces" ? "pieces" : "weight";
+}
+
+function formatPieceLabel(pieceName: string | undefined, amount: number) {
+  const label = pieceName?.trim() || "piece";
+  return amount === 1 || label.endsWith("s") ? label : `${label}s`;
+}
+
+function getRecipeYieldLabel(recipe: SavedRecipe) {
+  if (getRecipeYieldType(recipe) === "pieces") {
+    const count = recipe.pieceCount && recipe.pieceCount > 0 ? recipe.pieceCount : 1;
+    return `${formatAmount(count)} ${formatPieceLabel(recipe.pieceName, count)}`;
+  }
+
+  return `${recipe.cookedWeightGrams}g cooked`;
+}
+
+function getRecipeDisplayNutrition(recipe: SavedRecipe) {
+  if (getRecipeYieldType(recipe) === "pieces") {
+    return {
+      calories: recipe.caloriesPerPiece ?? recipe.caloriesPer100g,
+      protein: recipe.proteinPerPiece ?? recipe.proteinPer100g,
+      carbs: recipe.carbsPerPiece ?? recipe.carbsPer100g,
+      fat: recipe.fatPerPiece ?? recipe.fatPer100g,
+      suffix: `per ${formatPieceLabel(recipe.pieceName, 1)}`,
+    };
+  }
+
+  return {
+    calories: recipe.caloriesPer100g,
+    protein: recipe.proteinPer100g,
+    carbs: recipe.carbsPer100g,
+    fat: recipe.fatPer100g,
+    suffix: "per 100g",
+  };
+}
+
 function calculateRecipeNutrition(draft: RecipeDraft) {
   const cookedWeight = addNumber(draft.cookedWeightGrams);
+  const pieceCount = addAmount(draft.pieceCount);
   const totals = getRecipeTotals(draft.ingredients);
-  const ratio = cookedWeight > 0 ? 100 / cookedWeight : 0;
+  const weightRatio = cookedWeight > 0 ? 100 / cookedWeight : 0;
+  const pieceRatio = pieceCount > 0 ? 1 / pieceCount : 0;
 
   return {
     cookedWeight,
+    pieceCount,
     totals,
     per100g: {
-      calories: Math.round(totals.calories * ratio),
-      protein: Math.round(totals.protein * ratio),
-      carbs: Math.round(totals.carbs * ratio),
-      fat: Math.round(totals.fat * ratio),
+      calories: Math.round(totals.calories * weightRatio),
+      protein: Math.round(totals.protein * weightRatio),
+      carbs: Math.round(totals.carbs * weightRatio),
+      fat: Math.round(totals.fat * weightRatio),
+    },
+    perPiece: {
+      calories: Math.round(totals.calories * pieceRatio),
+      protein: Math.round(totals.protein * pieceRatio),
+      carbs: Math.round(totals.carbs * pieceRatio),
+      fat: Math.round(totals.fat * pieceRatio),
     },
   };
 }
 
-function scaleRecipePortion(recipe: SavedRecipe, gramsValue: string) {
-  const grams = addAmount(gramsValue);
+function scaleRecipePortion(recipe: SavedRecipe, amountValue: string) {
+  if (getRecipeYieldType(recipe) === "pieces") {
+    const pieces = addAmount(amountValue);
+    const pieceLabel = formatPieceLabel(recipe.pieceName, pieces);
+
+    return {
+      pieces,
+      title: `${formatAmount(pieces)} ${pieceLabel} ${recipe.name}`,
+      calories: Math.round((recipe.caloriesPerPiece ?? recipe.caloriesPer100g) * pieces),
+      protein: Math.round((recipe.proteinPerPiece ?? recipe.proteinPer100g) * pieces),
+      carbs: Math.round((recipe.carbsPerPiece ?? recipe.carbsPer100g) * pieces),
+      fat: Math.round((recipe.fatPerPiece ?? recipe.fatPer100g) * pieces),
+    };
+  }
+
+  const grams = addAmount(amountValue);
   const ratio = grams / 100;
 
   return {
@@ -653,7 +726,13 @@ function normalizeStoredSavedFoods(savedFoods: SavedFood[]) {
 }
 
 function normalizeStoredRecipes(recipes: SavedRecipe[]) {
-  return recipes.filter((recipe) => recipe.name && recipe.cookedWeightGrams > 0);
+  return recipes.filter((recipe) => {
+    if (!recipe.name) {
+      return false;
+    }
+
+    return getRecipeYieldType(recipe) === "pieces" ? (recipe.pieceCount ?? 0) > 0 : recipe.cookedWeightGrams > 0;
+  });
 }
 
 function normalizeStoredLogs(logs: MealLog[]) {
@@ -1398,7 +1477,7 @@ function MyFoodsSection({
         <div className="recipes-panel-header">
           <div>
             <h2>Recipes</h2>
-            <p>Save cooked recipes and log any gram portion.</p>
+            <p>Save cooked recipes and log by grams or pieces.</p>
           </div>
           <button className="compact-action-button" type="button" onClick={openNewRecipe}>
             {isRecipeBuilderOpen ? "Close" : "New recipe"}
@@ -1413,30 +1492,34 @@ function MyFoodsSection({
 
         {recipes.length > 0 ? (
           <div className="recipe-list">
-            {recipes.map((recipe) => (
-              <article className="recipe-card" key={recipe.id}>
-                <button className="recipe-card-main" type="button" onClick={() => setLogTarget({ type: "recipe", recipe })}>
-                  <span>
-                    <strong>{recipe.name}</strong>
-                    <small>{recipe.ingredients.length} ingredients · {recipe.cookedWeightGrams}g cooked</small>
-                  </span>
-                  <span>
-                    <strong>{recipe.caloriesPer100g} kcal</strong>
-                    <small>
-                      P {recipe.proteinPer100g}g · C {recipe.carbsPer100g}g · F {recipe.fatPer100g}g
-                    </small>
-                  </span>
-                </button>
-                <span className="recipe-card-actions">
-                  <button className="food-action-button" type="button" aria-label={`Edit ${recipe.name}`} onClick={() => openRecipeEditor(recipe)}>
-                    <Pencil size={14} strokeWidth={2.4} aria-hidden="true" />
+            {recipes.map((recipe) => {
+              const displayNutrition = getRecipeDisplayNutrition(recipe);
+
+              return (
+                <article className="recipe-card" key={recipe.id}>
+                  <button className="recipe-card-main" type="button" onClick={() => setLogTarget({ type: "recipe", recipe })}>
+                    <span>
+                      <strong>{recipe.name}</strong>
+                      <small>{recipe.ingredients.length} ingredients · {getRecipeYieldLabel(recipe)}</small>
+                    </span>
+                    <span>
+                      <strong>{displayNutrition.calories} kcal</strong>
+                      <small>
+                        P {displayNutrition.protein}g · C {displayNutrition.carbs}g · F {displayNutrition.fat}g
+                      </small>
+                    </span>
                   </button>
-                  <button className="food-action-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => onDeleteRecipe(recipe.id)}>
-                    <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
-                  </button>
-                </span>
-              </article>
-            ))}
+                  <span className="recipe-card-actions">
+                    <button className="food-action-button" type="button" aria-label={`Edit ${recipe.name}`} onClick={() => openRecipeEditor(recipe)}>
+                      <Pencil size={14} strokeWidth={2.4} aria-hidden="true" />
+                    </button>
+                    <button className="food-action-button" type="button" aria-label={`Delete ${recipe.name}`} onClick={() => onDeleteRecipe(recipe.id)}>
+                      <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
+                    </button>
+                  </span>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <p className="my-foods-empty">No saved recipes yet.</p>
@@ -1488,13 +1571,19 @@ function MyFoodLogDialog({
 }) {
   const [mealName, setMealName] = useState<MealName>("Breakfast");
   const labelPortion = target.type === "food" && target.entry.portion?.type === "label" ? target.entry.portion : null;
-  const [amount, setAmount] = useState(target.type === "recipe" ? "100" : labelPortion ? labelPortion.grams : "1");
+  const isPieceRecipe = target.type === "recipe" && getRecipeYieldType(target.recipe) === "pieces";
+  const [amount, setAmount] = useState(target.type === "recipe" ? (isPieceRecipe ? "1" : "100") : labelPortion ? labelPortion.grams : "1");
   const scaled = target.type === "recipe" ? scaleRecipePortion(target.recipe, amount) : scaleMyFoodPortion(target.entry, amount);
-  const canLog = scaled.calories > 0 && (("grams" in scaled && scaled.grams > 0) || ("amount" in scaled && scaled.amount > 0));
+  const canLog =
+    scaled.calories > 0 &&
+    (("grams" in scaled && typeof scaled.grams === "number" && scaled.grams > 0) ||
+      ("pieces" in scaled && typeof scaled.pieces === "number" && scaled.pieces > 0) ||
+      ("amount" in scaled && scaled.amount > 0));
   const title = target.type === "recipe" ? target.recipe.name : target.entry.title;
+  const recipeNutrition = target.type === "recipe" ? getRecipeDisplayNutrition(target.recipe) : null;
   const subtitle =
     target.type === "recipe"
-      ? `${target.recipe.caloriesPer100g} kcal per 100g`
+      ? `${recipeNutrition?.calories ?? 0} kcal ${recipeNutrition?.suffix ?? "per 100g"}`
       : labelPortion
         ? `${labelPortion.caloriesPer100g} kcal per 100g`
       : `${target.entry.calories} kcal per saved portion`;
@@ -1538,7 +1627,7 @@ function MyFoodLogDialog({
         </fieldset>
 
         <label className="field-label">
-          {target.type === "recipe" || labelPortion ? "Portion, g" : "Portions"}
+          {isPieceRecipe ? "Pieces" : target.type === "recipe" || labelPortion ? "Portion, g" : "Portions"}
           <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />
         </label>
 
@@ -1561,13 +1650,16 @@ function recipeDraftFromSaved(recipe: SavedRecipe | null): RecipeDraft {
   return recipe
     ? {
         name: recipe.name,
+        yieldType: getRecipeYieldType(recipe),
         cookedWeightGrams: String(recipe.cookedWeightGrams),
+        pieceCount: recipe.pieceCount ? String(recipe.pieceCount) : "1",
+        pieceName: recipe.pieceName ?? "piece",
         ingredients: recipe.ingredients.map((ingredient) => ({
           ...ingredient,
           id: ingredient.id || makeId(),
         })),
       }
-    : { name: "", cookedWeightGrams: "", ingredients: [] };
+    : { name: "", yieldType: "weight", cookedWeightGrams: "", pieceCount: "1", pieceName: "piece", ingredients: [] };
 }
 
 function RecipeBuilder({
@@ -1589,7 +1681,8 @@ function RecipeBuilder({
   const [labelError, setLabelError] = useState("");
   const ingredientMatches = useMemo(() => findFoodDatabaseMatches(ingredientQuery, 6), [ingredientQuery]);
   const nutrition = useMemo(() => calculateRecipeNutrition(draft), [draft]);
-  const canSave = draft.name.trim().length > 0 && nutrition.cookedWeight > 0 && draft.ingredients.length > 0;
+  const hasRecipeYield = draft.yieldType === "pieces" ? nutrition.pieceCount > 0 : nutrition.cookedWeight > 0;
+  const canSave = draft.name.trim().length > 0 && hasRecipeYield && draft.ingredients.length > 0;
 
   const addIngredient = (entry: FoodDatabaseEntry) => {
     setDraft((current) => ({ ...current, ingredients: [...current.ingredients, makeRecipeIngredient(entry)] }));
@@ -1686,15 +1779,22 @@ function RecipeBuilder({
     onSave({
       id: initialRecipe?.id ?? makeId(),
       name: draft.name.trim(),
-      cookedWeightGrams: nutrition.cookedWeight,
+      yieldType: draft.yieldType,
+      cookedWeightGrams: draft.yieldType === "weight" ? nutrition.cookedWeight : 0,
+      pieceCount: draft.yieldType === "pieces" ? nutrition.pieceCount : undefined,
+      pieceName: draft.yieldType === "pieces" ? draft.pieceName.trim() || "piece" : undefined,
       ingredients: draft.ingredients,
       caloriesPer100g: nutrition.per100g.calories,
       proteinPer100g: nutrition.per100g.protein,
       carbsPer100g: nutrition.per100g.carbs,
       fatPer100g: nutrition.per100g.fat,
+      caloriesPerPiece: draft.yieldType === "pieces" ? nutrition.perPiece.calories : undefined,
+      proteinPerPiece: draft.yieldType === "pieces" ? nutrition.perPiece.protein : undefined,
+      carbsPerPiece: draft.yieldType === "pieces" ? nutrition.perPiece.carbs : undefined,
+      fatPerPiece: draft.yieldType === "pieces" ? nutrition.perPiece.fat : undefined,
       createdAt: initialRecipe?.createdAt ?? new Date().toISOString(),
     });
-    setDraft({ name: "", cookedWeightGrams: "", ingredients: [] });
+    setDraft(recipeDraftFromSaved(null));
   };
 
   return (
@@ -1703,6 +1803,16 @@ function RecipeBuilder({
         Recipe name
         <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Pancakes" />
       </label>
+
+      <SegmentedControl
+        label="Recipe yield"
+        value={draft.yieldType}
+        options={[
+          { value: "weight", label: "Weight" },
+          { value: "pieces", label: "Pieces" },
+        ]}
+        onChange={(yieldType) => setDraft((current) => ({ ...current, yieldType }))}
+      />
 
       <div className="ingredient-compose-field">
         <label>
@@ -1788,21 +1898,45 @@ function RecipeBuilder({
         </div>
       ) : null}
 
-      <label className="field-label">
-        Finished cooked weight, g
-        <input
-          inputMode="numeric"
-          value={draft.cookedWeightGrams}
-          onChange={(event) => setDraft((current) => ({ ...current, cookedWeightGrams: event.target.value }))}
-          placeholder="360"
-        />
-      </label>
+      {draft.yieldType === "weight" ? (
+        <label className="field-label">
+          Finished cooked weight, g
+          <input
+            inputMode="numeric"
+            value={draft.cookedWeightGrams}
+            onChange={(event) => setDraft((current) => ({ ...current, cookedWeightGrams: event.target.value }))}
+            placeholder="360"
+          />
+        </label>
+      ) : (
+        <div className="field-grid">
+          <label className="field-label">
+            Pieces
+            <input
+              inputMode="decimal"
+              value={draft.pieceCount}
+              onChange={(event) => setDraft((current) => ({ ...current, pieceCount: event.target.value }))}
+              placeholder="1"
+            />
+          </label>
+          <label className="field-label">
+            Piece name
+            <input value={draft.pieceName} onChange={(event) => setDraft((current) => ({ ...current, pieceName: event.target.value }))} placeholder="pizza" />
+          </label>
+        </div>
+      )}
 
       <div className="recipe-total-card" aria-label="Recipe nutrition estimate">
         <span>Total: {nutrition.totals.calories} kcal</span>
-        <strong>
-          per 100g: {nutrition.per100g.calories} kcal · P {nutrition.per100g.protein}g · C {nutrition.per100g.carbs}g · F {nutrition.per100g.fat}g
-        </strong>
+        {draft.yieldType === "weight" ? (
+          <strong>
+            per 100g: {nutrition.per100g.calories} kcal · P {nutrition.per100g.protein}g · C {nutrition.per100g.carbs}g · F {nutrition.per100g.fat}g
+          </strong>
+        ) : (
+          <strong>
+            per {formatPieceLabel(draft.pieceName, 1)}: {nutrition.perPiece.calories} kcal · P {nutrition.perPiece.protein}g · C {nutrition.perPiece.carbs}g · F {nutrition.perPiece.fat}g
+          </strong>
+        )}
       </div>
 
       <button className="save-meal-button" type="button" disabled={!canSave} onClick={saveRecipe}>
@@ -1886,7 +2020,7 @@ function LogSheet({
     applyDatabasePortion(updated.entry, updated.amount, updated.unit);
   };
 
-  const updateDraftPortion = (next: Partial<Record<"amount" | "unit" | "grams", string>>) => {
+  const updateDraftPortion = (next: Partial<Record<"amount" | "unit" | "grams" | "pieces", string>>) => {
     if (!draft.portion) {
       return;
     }
@@ -1901,7 +2035,7 @@ function LogSheet({
 
     if (portion.type === "recipe") {
       const recipe = recipes.find((candidate) => candidate.id === portion.recipeId);
-      scaled = recipe ? scaleRecipePortion(recipe, portion.grams) : null;
+      scaled = recipe ? scaleRecipePortion(recipe, getRecipeYieldType(recipe) === "pieces" ? portion.pieces ?? "1" : portion.grams ?? "100") : null;
     }
 
     if (portion.type === "savedFood") {
@@ -2177,12 +2311,24 @@ function LogSheet({
           </label>
         </div>
       ) : null}
-      {draft.portion.type === "recipe" ? (
-        <label className="field-label">
-          Portion, g
-          <input inputMode="decimal" value={draft.portion.grams} onChange={(event) => updateDraftPortion({ grams: event.target.value })} />
-        </label>
-      ) : null}
+      {draft.portion.type === "recipe"
+        ? (() => {
+            const portion = draft.portion as Extract<PortionReference, { type: "recipe" }>;
+            const recipe = recipes.find((candidate) => candidate.id === portion.recipeId);
+            const isPieces = Boolean(recipe && getRecipeYieldType(recipe) === "pieces");
+
+            return (
+              <label className="field-label">
+                {isPieces ? "Pieces" : "Portion, g"}
+                <input
+                  inputMode="decimal"
+                  value={isPieces ? portion.pieces ?? "1" : portion.grams ?? "100"}
+                  onChange={(event) => updateDraftPortion(isPieces ? { pieces: event.target.value } : { grams: event.target.value })}
+                />
+              </label>
+            );
+          })()
+        : null}
       {draft.portion.type === "savedFood" ? (
         <label className="field-label">
           Portions
@@ -2672,10 +2818,13 @@ export function App() {
     showToast("Recipe deleted");
   };
 
-  const logRecipe = (recipe: SavedRecipe, mealName: MealName, gramsValue: string) => {
-    const scaled = scaleRecipePortion(recipe, gramsValue);
+  const logRecipe = (recipe: SavedRecipe, mealName: MealName, amountValue: string) => {
+    const scaled = scaleRecipePortion(recipe, amountValue);
+    const hasValidAmount =
+      ("grams" in scaled && typeof scaled.grams === "number" && scaled.grams > 0) ||
+      ("pieces" in scaled && typeof scaled.pieces === "number" && scaled.pieces > 0);
 
-    if (scaled.grams <= 0 || scaled.calories <= 0) {
+    if (!hasValidAmount || scaled.calories <= 0) {
       return;
     }
 
@@ -2693,7 +2842,7 @@ export function App() {
       portion: {
         type: "recipe",
         recipeId: recipe.id,
-        grams: gramsValue,
+        ...(getRecipeYieldType(recipe) === "pieces" ? { pieces: amountValue } : { grams: amountValue }),
       },
     };
 
