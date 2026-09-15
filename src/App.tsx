@@ -1365,18 +1365,26 @@ function MyFoodsSection({
     setIsRecipeBuilderOpen(true);
   };
 
-  const renderFoodCard = (entry: MyFoodEntry) => (
-    <button className="my-food-card" key={entry.signature} type="button" onClick={() => setLogTarget({ type: "food", entry })}>
-      <div className="my-food-card-copy">
-        <span className="my-food-title">{entry.title}</span>
-        <span className="my-food-meta">
-          {entry.calories} kcal · Last: {entry.mealName}
+  const renderFoodCard = (entry: MyFoodEntry, canDelete = false) => (
+    <article className={canDelete ? "recipe-card" : "recipe-card recipe-card-no-actions"} key={entry.signature}>
+      <button className="recipe-card-main" type="button" onClick={() => setLogTarget({ type: "food", entry })}>
+        <span>
+          <strong>{entry.title}</strong>
+          <small>{entry.portion?.type === "label" ? `${entry.portion.grams}g default portion` : canDelete ? "Saved portion" : `Last: ${entry.mealName}`}</small>
         </span>
-        <span className="my-food-macros">
-          P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+        <span>
+          <strong>{entry.calories} kcal</strong>
+          <small>
+            P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+          </small>
         </span>
-      </div>
-    </button>
+      </button>
+      {canDelete && entry.savedFoodId ? (
+        <button className="food-action-button recipe-delete-button" type="button" aria-label={`Delete ${entry.title}`} onClick={() => onDeleteSavedFood(entry.savedFoodId!)}>
+          <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
+        </button>
+      ) : null}
+    </article>
   );
 
   return (
@@ -1388,35 +1396,6 @@ function MyFoodsSection({
       </div>
 
       {saved.length === 0 && frequent.length === 0 && recipes.length === 0 ? <p className="my-foods-empty">Save foods you repeat often or let frequent logs appear here automatically.</p> : null}
-
-      {saved.length > 0 ? (
-        <div className="my-foods-group">
-          <h2>Saved foods</h2>
-          <div className="recipe-list">
-            {saved.map((entry) => (
-              <article className="recipe-card" key={entry.signature}>
-                <button className="recipe-card-main" type="button" onClick={() => setLogTarget({ type: "food", entry })}>
-                  <span>
-                    <strong>{entry.title}</strong>
-                    <small>{entry.portion?.type === "label" ? `${entry.portion.grams}g default portion` : "Saved portion"}</small>
-                  </span>
-                  <span>
-                    <strong>{entry.calories} kcal</strong>
-                    <small>
-                      P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
-                    </small>
-                  </span>
-                </button>
-                {entry.savedFoodId ? (
-                  <button className="food-action-button recipe-delete-button" type="button" aria-label={`Delete ${entry.title}`} onClick={() => onDeleteSavedFood(entry.savedFoodId!)}>
-                    <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
-                  </button>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       <section className="recipes-panel" aria-label="Saved recipes">
         <div className="recipes-panel-header">
@@ -1467,10 +1446,17 @@ function MyFoodsSection({
         )}
       </section>
 
+      {saved.length > 0 ? (
+        <div className="my-foods-group">
+          <h2>Saved foods</h2>
+          <div className="recipe-list">{saved.map((entry) => renderFoodCard(entry, true))}</div>
+        </div>
+      ) : null}
+
       {frequent.length > 0 ? (
         <div className="my-foods-group">
           <h2>Frequently added</h2>
-          <div className="my-foods-row">{frequent.map((entry) => renderFoodCard(entry))}</div>
+          <div className="recipe-list">{frequent.map((entry) => renderFoodCard(entry))}</div>
         </div>
       ) : null}
 

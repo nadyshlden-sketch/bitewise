@@ -814,6 +814,10 @@ button {
   padding: 12px;
 }
 
+.recipe-card-no-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .recipe-card-main {
   min-width: 0;
   display: grid;
@@ -2088,14 +2092,6 @@ button {
     width: min(100vw, var(--frame-max));
   }
 
-  .my-foods-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0;
-    padding: 0;
-    overflow: visible;
-  }
-
   .my-food-card {
     min-width: 0;
   }
@@ -2117,10 +2113,6 @@ button {
 
   .phone-frame {
     width: min(100vw, var(--frame-max));
-  }
-
-  .my-foods-row {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .meal-sheet {
