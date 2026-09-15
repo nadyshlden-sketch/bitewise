@@ -108,11 +108,24 @@ type SavedRecipe = {
   createdAt: string;
 };
 
+type SavedFood = {
+  id: string;
+  title: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  mealName: MealName;
+  createdAt: string;
+  portion?: PortionReference;
+};
+
 type StoredState = {
   version: number;
   profile: Profile | null;
   logs: MealLog[];
   recipes: SavedRecipe[];
+  savedFoods: SavedFood[];
 };
 
 type MealSummary = {
@@ -135,6 +148,8 @@ type MyFoodEntry = {
   fat: number;
   loggedAt: string;
   count: number;
+  savedFoodId?: string;
+  portion?: PortionReference;
 };
 
 type LogDraft = {
@@ -218,7 +233,7 @@ type ToastState = {
   message: string;
 };
 
-const CURRENT_STORAGE_VERSION = 7;
+const CURRENT_STORAGE_VERSION = 8;
 const STORAGE_KEY = "bitewise-state-v5";
 
 const mealOrder: Array<Pick<MealSummary, "name" | "tone">> = [
@@ -246,6 +261,7 @@ const fallbackState: StoredState = {
   profile: null,
   logs: [],
   recipes: [],
+  savedFoods: [],
 };
 
 const addNumber = (value: string) => {
@@ -462,6 +478,10 @@ function scaleRecipePortion(recipe: SavedRecipe, gramsValue: string) {
 }
 
 function scaleMyFoodPortion(entry: MyFoodEntry, amountValue: string) {
+  if (entry.portion?.type === "label") {
+    return scaleLabelPortion(entry.portion, amountValue);
+  }
+
   const amount = addAmount(amountValue);
 
   return {
@@ -543,7 +563,23 @@ function foodSignature(log: MealLog) {
   return [log.title.trim().toLowerCase(), log.calories, log.protein, log.carbs, log.fat].join("|");
 }
 
-function getMyFoods(logs: MealLog[]) {
+function savedFoodToMyFoodEntry(food: SavedFood): MyFoodEntry {
+  return {
+    signature: `saved:${food.id}`,
+    mealName: food.mealName,
+    title: food.title,
+    calories: food.calories,
+    protein: food.protein,
+    carbs: food.carbs,
+    fat: food.fat,
+    loggedAt: food.createdAt,
+    count: 1,
+    savedFoodId: food.id,
+    portion: food.portion,
+  };
+}
+
+function getMyFoods(logs: MealLog[], savedFoods: SavedFood[]) {
   const sortedLogs = [...logs].sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
   const bySignature = new Map<string, MyFoodEntry>();
 
@@ -572,6 +608,7 @@ function getMyFoods(logs: MealLog[]) {
   const entries = [...bySignature.values()];
 
   return {
+    saved: savedFoods.map(savedFoodToMyFoodEntry),
     recent: entries.slice(0, 5),
     frequent: [...entries]
       .filter((entry) => entry.count >= 2)
@@ -604,10 +641,15 @@ function loadStoredState(): StoredState {
       profile,
       logs: normalizeStoredLogs(parsed.logs ?? []),
       recipes: normalizeStoredRecipes(parsed.recipes ?? []),
+      savedFoods: normalizeStoredSavedFoods(parsed.savedFoods ?? []),
     };
   } catch {
     return fallbackState;
   }
+}
+
+function normalizeStoredSavedFoods(savedFoods: SavedFood[]) {
+  return savedFoods.filter((food) => food.id && food.title && food.calories > 0);
 }
 
 function normalizeStoredRecipes(recipes: SavedRecipe[]) {
@@ -1287,6 +1329,7 @@ function MealCard({
 }
 
 function MyFoodsSection({
+  saved,
   frequent,
   recipes,
   apiKey,
@@ -1295,7 +1338,9 @@ function MyFoodsSection({
   onSaveRecipe,
   onLogRecipe,
   onDeleteRecipe,
+  onDeleteSavedFood,
 }: {
+  saved: MyFoodEntry[];
   frequent: MyFoodEntry[];
   recipes: SavedRecipe[];
   apiKey: string;
@@ -1304,6 +1349,7 @@ function MyFoodsSection({
   onSaveRecipe: (recipe: SavedRecipe) => void;
   onLogRecipe: (recipe: SavedRecipe, mealName: MealName, grams: string) => void;
   onDeleteRecipe: (id: string) => void;
+  onDeleteSavedFood: (id: string) => void;
 }) {
   const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
   const [logTarget, setLogTarget] = useState<MyFoodLogTarget | null>(null);
@@ -1330,7 +1376,36 @@ function MyFoodsSection({
         <p>Tap a food or recipe to choose portion and meal.</p>
       </div>
 
-      {frequent.length === 0 && recipes.length === 0 ? <p className="my-foods-empty">Foods you log often will appear here automatically.</p> : null}
+      {saved.length === 0 && frequent.length === 0 && recipes.length === 0 ? <p className="my-foods-empty">Save foods you repeat often or let frequent logs appear here automatically.</p> : null}
+
+      {saved.length > 0 ? (
+        <div className="my-foods-group">
+          <h2>Saved foods</h2>
+          <div className="recipe-list">
+            {saved.map((entry) => (
+              <article className="recipe-card" key={entry.signature}>
+                <button className="recipe-card-main" type="button" onClick={() => setLogTarget({ type: "food", entry })}>
+                  <span>
+                    <strong>{entry.title}</strong>
+                    <small>{entry.portion?.type === "label" ? `${entry.portion.grams}g default portion` : "Saved portion"}</small>
+                  </span>
+                  <span>
+                    <strong>{entry.calories} kcal</strong>
+                    <small>
+                      P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g
+                    </small>
+                  </span>
+                </button>
+                {entry.savedFoodId ? (
+                  <button className="food-action-button recipe-delete-button" type="button" aria-label={`Delete ${entry.title}`} onClick={() => onDeleteSavedFood(entry.savedFoodId!)}>
+                    <Trash2 size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <section className="recipes-panel" aria-label="Saved recipes">
         <div className="recipes-panel-header">
@@ -1412,13 +1487,16 @@ function MyFoodLogDialog({
   onLogRecipe: (recipe: SavedRecipe, mealName: MealName, grams: string) => void;
 }) {
   const [mealName, setMealName] = useState<MealName>("Breakfast");
-  const [amount, setAmount] = useState(target.type === "recipe" ? "100" : "1");
+  const labelPortion = target.type === "food" && target.entry.portion?.type === "label" ? target.entry.portion : null;
+  const [amount, setAmount] = useState(target.type === "recipe" ? "100" : labelPortion ? labelPortion.grams : "1");
   const scaled = target.type === "recipe" ? scaleRecipePortion(target.recipe, amount) : scaleMyFoodPortion(target.entry, amount);
-  const canLog = target.type === "recipe" ? scaled.calories > 0 && "grams" in scaled && scaled.grams > 0 : scaled.calories > 0 && "amount" in scaled && scaled.amount > 0;
+  const canLog = scaled.calories > 0 && (("grams" in scaled && scaled.grams > 0) || ("amount" in scaled && scaled.amount > 0));
   const title = target.type === "recipe" ? target.recipe.name : target.entry.title;
   const subtitle =
     target.type === "recipe"
       ? `${target.recipe.caloriesPer100g} kcal per 100g`
+      : labelPortion
+        ? `${labelPortion.caloriesPer100g} kcal per 100g`
       : `${target.entry.calories} kcal per saved portion`;
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -1460,7 +1538,7 @@ function MyFoodLogDialog({
         </fieldset>
 
         <label className="field-label">
-          {target.type === "recipe" ? "Portion, g" : "Portions"}
+          {target.type === "recipe" || labelPortion ? "Portion, g" : "Portions"}
           <input inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />
         </label>
 
@@ -1716,6 +1794,7 @@ function LogSheet({
   setDraft,
   onClose,
   onSave,
+  onSaveFood,
   apiKey,
   onNeedApiKey,
   recipes,
@@ -1724,6 +1803,7 @@ function LogSheet({
   setDraft: Dispatch<SetStateAction<LogDraft | null>>;
   onClose: () => void;
   onSave: (keepOpen?: boolean) => void;
+  onSaveFood: () => void;
   apiKey: string;
   onNeedApiKey: () => void;
   recipes: SavedRecipe[];
@@ -1855,6 +1935,7 @@ function LogSheet({
           }
         : current,
     );
+    setShowManualDetails(true);
   };
 
   const estimateWithAi = async () => {
@@ -1935,6 +2016,7 @@ function LogSheet({
           }
         : current,
     );
+    setShowManualDetails(true);
   };
 
   const scanFoodLabel = async (file: File | undefined) => {
@@ -2043,6 +2125,9 @@ function LogSheet({
       <button className="save-meal-button" type="submit" disabled={!canSave}>
         {draft.editingId ? "Save food" : `Add to ${draft.mealName}`}
       </button>
+      <button className="secondary-save-button" type="button" disabled={!canSave} onClick={onSaveFood}>
+        Save as saved food
+      </button>
     </>
   );
 
@@ -2079,6 +2164,12 @@ function LogSheet({
         <label className="field-label">
           Portions
           <input inputMode="decimal" value={draft.portion.amount} onChange={(event) => updateDraftPortion({ amount: event.target.value })} />
+        </label>
+      ) : null}
+      {draft.portion.type === "label" ? (
+        <label className="field-label">
+          Portion, g
+          <input inputMode="decimal" value={draft.portion.grams} onChange={(event) => updateDraftPortion({ grams: event.target.value })} />
         </label>
       ) : null}
     </section>
@@ -2240,9 +2331,14 @@ function LogSheet({
                     </li>
                   ))}
                 </ul>
-                <button className="quick-add-button ai-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
-                  Add all
-                </button>
+                <div className="quick-action-row">
+                  <button className="quick-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
+                    Add to {draft.mealName}
+                  </button>
+                  <button className="quick-add-button quick-secondary-button" type="button" disabled={!canSave} onClick={onSaveFood}>
+                    Save food
+                  </button>
+                </div>
               </div>
             ) : null}
 
@@ -2258,9 +2354,14 @@ function LogSheet({
                   Portion, g
                   <input inputMode="decimal" value={draft.labelGrams} onChange={(event) => updateLabelGrams(event.target.value)} />
                 </label>
-                <button className="quick-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
-                  Add to {draft.mealName}
-                </button>
+                <div className="quick-action-row">
+                  <button className="quick-add-button" type="button" disabled={!canSave} onClick={() => onSave(false)}>
+                    Add to {draft.mealName}
+                  </button>
+                  <button className="quick-add-button quick-secondary-button" type="button" disabled={!canSave} onClick={onSaveFood}>
+                    Save food
+                  </button>
+                </div>
               </div>
             ) : null}
           </section>
@@ -2304,7 +2405,7 @@ export function App() {
   const frameRef = useRef<HTMLElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
-  const { profile, logs, recipes } = storedState;
+  const { profile, logs, recipes, savedFoods } = storedState;
   const dateIndicator = getDateIndicator(selectedDateKey);
 
   useEffect(() => {
@@ -2369,7 +2470,7 @@ export function App() {
     }));
   }, [profile, selectedLogs]);
 
-  const myFoods = useMemo(() => getMyFoods(logs), [logs]);
+  const myFoods = useMemo(() => getMyFoods(logs, savedFoods), [logs, savedFoods]);
 
   if (!profile) {
     return (
@@ -2431,12 +2532,80 @@ export function App() {
     showToast("Food deleted");
   };
 
+  const saveDraftAsSavedFood = () => {
+    if (!draft) {
+      return;
+    }
+
+    const title = (draft.portion?.type === "label" ? draft.portion.name : draft.title).trim();
+    const calories = addNumber(draft.calories);
+    if (!title || calories <= 0) {
+      return;
+    }
+
+    const nextFood: SavedFood = {
+      id: makeId(),
+      title,
+      calories,
+      protein: addNumber(draft.protein),
+      carbs: addNumber(draft.carbs),
+      fat: addNumber(draft.fat),
+      mealName: draft.mealName,
+      createdAt: new Date().toISOString(),
+      portion: draft.portion,
+    };
+
+    setStoredState((current) => {
+      const existing = current.savedFoods.find((food) => food.title.trim().toLowerCase() === title.toLowerCase());
+      const savedFood = existing
+        ? {
+            ...nextFood,
+            id: existing.id,
+            createdAt: existing.createdAt,
+          }
+        : nextFood;
+
+      return {
+        ...current,
+        version: CURRENT_STORAGE_VERSION,
+        savedFoods: [savedFood, ...current.savedFoods.filter((food) => food.id !== savedFood.id)],
+      };
+    });
+    showToast("Food saved to My Foods");
+  };
+
+  const deleteSavedFood = (id: string) => {
+    setStoredState((current) => ({
+      ...current,
+      version: CURRENT_STORAGE_VERSION,
+      savedFoods: current.savedFoods.filter((food) => food.id !== id),
+    }));
+    showToast("Saved food deleted");
+  };
+
   const relogFood = (entry: MyFoodEntry, mealName: MealName, amountValue: string) => {
     const scaled = scaleMyFoodPortion(entry, amountValue);
 
-    if (scaled.amount <= 0 || scaled.calories <= 0) {
+    const hasValidAmount = ("grams" in scaled && scaled.grams > 0) || ("amount" in scaled && scaled.amount > 0);
+    if (!hasValidAmount || scaled.calories <= 0) {
       return;
     }
+
+    const portion =
+      entry.portion?.type === "label"
+        ? {
+            ...entry.portion,
+            grams: amountValue,
+          }
+        : {
+            type: "savedFood" as const,
+            baseTitle: entry.title,
+            baseCalories: entry.calories,
+            baseProtein: entry.protein,
+            baseCarbs: entry.carbs,
+            baseFat: entry.fat,
+            amount: amountValue,
+          };
 
     const nextLog: MealLog = {
       id: makeId(),
@@ -2449,15 +2618,7 @@ export function App() {
       protein: scaled.protein,
       carbs: scaled.carbs,
       fat: scaled.fat,
-      portion: {
-        type: "savedFood",
-        baseTitle: entry.title,
-        baseCalories: entry.calories,
-        baseProtein: entry.protein,
-        baseCarbs: entry.carbs,
-        baseFat: entry.fat,
-        amount: amountValue,
-      },
+      portion,
     };
 
     setStoredState((current) => ({
@@ -2555,40 +2716,24 @@ export function App() {
       return;
     }
 
-    const timestamp = new Date().toISOString();
-    const nextLogs: MealLog[] = draft.aiResult?.items.length
-      ? draft.aiResult.items.map((item) => ({
-          id: makeId(),
-          kind: "meal",
-          dateKey: selectedDateKey,
-          loggedAt: timestamp,
-          mealName: draft.mealName,
-          title: `${item.quantity} ${item.name}`.trim(),
-          calories: item.calories,
-          protein: item.protein,
-          carbs: item.carbs,
-          fat: item.fat,
-        }))
-      : [
-          {
-            id: makeId(),
-            kind: "meal",
-            dateKey: selectedDateKey,
-            loggedAt: timestamp,
-            mealName: draft.mealName,
-            title,
-            calories,
-            protein: addNumber(draft.protein),
-            carbs: addNumber(draft.carbs),
-            fat: addNumber(draft.fat),
-            portion: draft.portion,
-          },
-        ];
+    const nextLog: MealLog = {
+      id: makeId(),
+      kind: "meal",
+      dateKey: selectedDateKey,
+      loggedAt: new Date().toISOString(),
+      mealName: draft.mealName,
+      title,
+      calories,
+      protein: addNumber(draft.protein),
+      carbs: addNumber(draft.carbs),
+      fat: addNumber(draft.fat),
+      portion: draft.portion,
+    };
 
     setStoredState((current) => ({
       ...current,
       version: CURRENT_STORAGE_VERSION,
-      logs: [...current.logs, ...nextLogs],
+      logs: [...current.logs, nextLog],
     }));
     setExpandedMeal(draft.mealName);
     setDraft(keepOpen ? makeEmptyLogDraft(draft.mealName) : null);
@@ -2639,6 +2784,7 @@ export function App() {
                   setDraft={setDraft}
                   onClose={() => setDraft(null)}
                   onSave={saveLog}
+                  onSaveFood={saveDraftAsSavedFood}
                   apiKey={geminiApiKey}
                   onNeedApiKey={() => setActiveView("settings")}
                   recipes={recipes}
@@ -2661,6 +2807,7 @@ export function App() {
             </>
           ) : activeView === "foods" ? (
             <MyFoodsSection
+              saved={myFoods.saved}
               frequent={myFoods.frequent}
               recipes={recipes}
               apiKey={geminiApiKey}
@@ -2669,6 +2816,7 @@ export function App() {
               onSaveRecipe={saveRecipe}
               onLogRecipe={logRecipe}
               onDeleteRecipe={deleteRecipe}
+              onDeleteSavedFood={deleteSavedFood}
             />
           ) : (
             <SettingsScreen

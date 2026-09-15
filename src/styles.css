@@ -1545,6 +1545,25 @@ button {
   opacity: 0.45;
 }
 
+.quick-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.quick-action-row .quick-add-button {
+  width: 100%;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.quick-secondary-button,
+.secondary-save-button {
+  background: var(--surface-container-low);
+  color: var(--ink);
+}
+
 .field-label textarea {
   width: 100%;
   min-height: 92px;
@@ -1835,6 +1854,21 @@ button {
   opacity: 0.45;
 }
 
+.secondary-save-button {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 8px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary-save-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .key-status {
   margin: -2px 0 14px;
   padding: 10px 12px;
@@ -2022,6 +2056,7 @@ button {
   .summary-edit-button:hover,
   .sheet-close:hover,
   .segment:hover,
+  .secondary-save-button:not(:disabled):hover,
   .save-meal-button:not(:disabled):hover {
     filter: brightness(0.97);
   }
