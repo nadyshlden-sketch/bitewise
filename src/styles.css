@@ -876,20 +876,21 @@ button {
 }
 
 .my-food-dialog-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 12;
+  z-index: 30;
   display: grid;
   align-items: end;
-  padding: var(--edge);
+  justify-items: center;
+  padding: var(--edge) var(--edge) calc(var(--edge) + max(14px, env(safe-area-inset-bottom)));
   background: rgba(0, 0, 0, 0.28);
 }
 
 .my-food-dialog {
   display: grid;
   gap: 12px;
-  width: 100%;
-  max-height: calc(100svh - 42px);
+  width: min(100%, calc(var(--frame-max) - (var(--edge) * 2)));
+  max-height: calc(100svh - (var(--edge) * 2) - max(14px, env(safe-area-inset-bottom)));
   overflow-y: auto;
   border-radius: 24px;
   background: var(--white);
@@ -1970,6 +1971,11 @@ button {
 .bottom-nav-item-active {
   background: var(--meadow-2);
   color: var(--ink);
+}
+
+.phone-frame:has(.my-food-dialog-backdrop) .bottom-nav {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .save-toast {
